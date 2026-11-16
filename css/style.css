@@ -156,13 +156,22 @@ body.red-alert {
 /* Station Navigation Tabs */
 #station-nav {
   display: flex;
+  flex-wrap: wrap;
+  align-content: center;
   background: #0a140e;
   border-bottom: 2px solid var(--border-color);
-  height: 32px;
-  padding: 2px 6px;
+  height: auto;
+  min-height: 32px;
+  padding: 3px 6px;
   gap: 4px;
   align-items: center;
   flex-shrink: 0;
+}
+
+#station-nav > .station-tab,
+#station-nav > .mil-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .station-tab {
@@ -203,7 +212,12 @@ body.red-alert {
 /* Warning Annunciator Lights in Nav Bar */
 #annunciator-strip {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
+}
+
+.annunciator {
+  white-space: nowrap;
 }
 
 .annunciator {
