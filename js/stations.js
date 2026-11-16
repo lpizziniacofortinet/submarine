@@ -1007,11 +1007,11 @@ class StationRenderers {
         const hh = String(Math.floor(total / 3600)).padStart(2, '0');
         const mm = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
         const ss = String(total % 60).padStart(2, '0');
-        return \`\${hh}:\${mm}:\${ss}Z\`;
+        return `${hh}:${mm}:${ss}Z`;
       })();
 
       const drawText = (text, x, y, size = 10, color = '#c8d8e3', weight = 600, align = 'left') => {
-        ctx.font = \`\${weight} \${size}px Arial, Helvetica, sans-serif\`;
+        ctx.font = `${weight} ${size}px Arial, Helvetica, sans-serif`;
         ctx.textAlign = align;
         ctx.textBaseline = 'middle';
         ctx.fillStyle = color;
@@ -1090,7 +1090,7 @@ class StationRenderers {
             : 'OPTICAL CHANNEL STANDBY  /  RAISE MAST TO ACQUIRE LIVE PICTURE',
           gx, by + 109, 9, '#8da9ba', 600, 'center'
         );
-        drawText(\`OWN DEPTH  \${sub.depthM.toFixed(1)} m\`, gx, by + 133, 10,
+        drawText(`OWN DEPTH  ${sub.depthM.toFixed(1)} m`, gx, by + 133, 10,
           interlocked ? '#e2b16b' : '#a8c1cf', 700, 'center');
 
         drawPanel(18, h - 37, w - 36, 22, 'rgba(5, 13, 21, 0.72)');
@@ -1142,8 +1142,8 @@ class StationRenderers {
           if (y > h - 35) break;
           const alpha = (thermal ? 0.10 : 0.12) + i * 0.008;
           ctx.strokeStyle = thermal
-            ? \`rgba(223, 232, 229, \${alpha})\`
-            : \`rgba(195, 218, 223, \${alpha})\`;
+            ? `rgba(223, 232, 229, ${alpha})`
+            : `rgba(195, 218, 223, ${alpha})`;
           ctx.lineWidth = i < 5 ? 0.7 : 1;
           ctx.beginPath();
           for (let x = -12; x <= w + 12; x += 12) {
@@ -1227,7 +1227,7 @@ class StationRenderers {
         }
 
         visibleContacts.forEach(({ contact, sx, shipY, shipHeight, rangeNm }) => {
-          const label = \`\${contact.designation}  /  \${rangeNm.toFixed(1)} NM\`;
+          const label = `${contact.designation}  /  ${rangeNm.toFixed(1)} NM`;
           ctx.font = '700 9px Arial, Helvetica, sans-serif';
           const labelWidth = Math.min(150, ctx.measureText(label).width + 12);
           const lx = clamp(sx - labelWidth / 2, 12, w - labelWidth - 12);
@@ -1259,8 +1259,8 @@ class StationRenderers {
         drawPanel(0, 0, w, 30, 'rgba(5, 15, 24, 0.90)');
         drawText(thermal ? 'FLIR  /  WHITE HOT' : 'EO  /  DAY-NIGHT CHANNEL', 14, 15, 10,
           thermal ? '#e6e9e2' : '#b8d0df', 700);
-        drawText(\`MAG \${zoom.toFixed(1)}×\`, w * 0.5, 15, 10, '#e4c58f', 700, 'center');
-        drawText(\`AN/BVS-1     \${clock}\`, w - 14, 15, 9, '#a8becc', 600, 'right');
+        drawText(`MAG ${zoom.toFixed(1)}×`, w * 0.5, 15, 10, '#e4c58f', 700, 'center');
+        drawText(`AN/BVS-1     ${clock}`, w - 14, 15, 9, '#a8becc', 600, 'right');
 
         drawPanel(0, 30, w, 27, 'rgba(8, 20, 30, 0.70)');
         const tapeY = 44;
@@ -1319,8 +1319,8 @@ class StationRenderers {
 
         drawPanel(0, h - 29, w, 29, 'rgba(5, 15, 24, 0.92)');
         drawText('MAST  EXTENDED', 14, h - 14, 9, '#a9d4c9', 700);
-        drawText(\`DEPTH \${sub.depthM.toFixed(1)} m\`, w * 0.36, h - 14, 9, '#c5d4dc', 600, 'center');
-        drawText(\`OWN HDG \${String(Math.round(sub.heading || 0)).padStart(3, '0')}°\`, w * 0.64, h - 14, 9, '#c5d4dc', 600, 'center');
+        drawText(`DEPTH ${sub.depthM.toFixed(1)} m`, w * 0.36, h - 14, 9, '#c5d4dc', 600, 'center');
+        drawText(`OWN HDG ${String(Math.round(sub.heading || 0)).padStart(3, '0')}°`, w * 0.64, h - 14, 9, '#c5d4dc', 600, 'center');
         drawText(thermal ? 'IR SENSOR' : 'OPTICAL SENSOR', w - 14, h - 14, 9, '#e4c58f', 700, 'right');
         drawCornerFrame('rgba(201, 220, 231, 0.52)');
       }
