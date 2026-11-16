@@ -139,9 +139,21 @@ class SubmarineWorld {
       const rawDt = Math.max(0, (now - lastTimestamp) / 1000.0);
       lastTimestamp = now;
       const compression = Math.max(0, this.timeCompression);
-      this.simulationClock.advance(rawDt * compression, (fixedDt) => {
-        this.stepSimulation(fixedDt, compression > 0 ? fixedDt / compression : 0);
-      });
+
+      // Keep the wall-clock stall limit independent from time compression.
+      // At 10x, a normal 30 FPS frame represents ~0.333s of simulation time;
+      // the clock must be allowed enough fixed substeps to process it instead
+      // of clamping it to the 1x 0.25s budget and silently losing simulation time.
+      if (compression > 0) {
+        this.simulationClock.maxFrameDeltaSec = 0.25 * compression;
+        this.simulationClock.maxSubSteps = Math.max(
+          1,
+          Math.ceil(this.simulationClock.maxFrameDeltaSec / this.simulationClock.fixedStepSec)
+        );
+        this.simulationClock.advance(rawDt * compression, (fixedDt) => {
+          this.stepSimulation(fixedDt, fixedDt / compression);
+        });
+      }
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
@@ -172,7 +184,7 @@ class SubmarineWorld {
     if (!this.currentMission || this.gameOver) return;
     try {
       const state = {
-        version: 2,
+        version: 3,
         savedAtStr: new Date().toLocaleTimeString(),
         simTimeSec: this.simTimeSec,
         currentMission: this.currentMission,
@@ -181,35 +193,10 @@ class SubmarineWorld {
         torpedoMagazine: this.torpedoMagazine,
         torpedoTubes: this.torpedoTubes,
         vlsTubes: this.vlsTubes,
-        ownSub: {
-          lat: this.ownSub.lat,
-          lon: this.ownSub.lon,
-          heading: this.ownSub.heading,
-          orderedHeading: this.ownSub.orderedHeading,
-          speedKts: this.ownSub.speedKts,
-          orderedSpeedKts: this.ownSub.orderedSpeedKts,
-          depthM: this.ownSub.depthM,
-          orderedDepthM: this.ownSub.orderedDepthM,
-          mbtFillPct: this.ownSub.mbtFillPct,
-          hpAirPsi: this.ownSub.hpAirPsi,
-          auxTrimTons: this.ownSub.auxTrimTons,
-          hullIntegrityPct: this.ownSub.hullIntegrityPct,
-          towedArrayDeployed: this.ownSub.towedArrayDeployed,
-          towedArrayDamaged: this.ownSub.towedArrayDamaged,
-          decoysRemaining: this.ownSub.decoysRemaining,
-          waypoint: this.ownSub.waypoint
-        },
-        reactor: {
-          status: this.reactor.status,
-          autoRegulator: this.reactor.autoRegulator,
-          rodPositionPct: this.reactor.rodPositionPct,
-          neutronFluxPct: this.reactor.neutronFluxPct,
-          pumpMode: this.reactor.pumpMode,
-          tAvgC: this.reactor.tAvgC,
-          steamPressurePsi: this.reactor.steamPressurePsi,
-          batteryPct: this.reactor.batteryPct,
-          dieselRunning: this.reactor.dieselRunning
-        },
+        // Persist every enumerable runtime field so a resumed patrol restores
+        // helm, ballast, mast, damage, acoustic and other subsystem states too.
+        ownSub: { ...this.ownSub },
+        reactor: { ...this.reactor },
         contacts: this.contacts.map((c) => c.serialize()),
         weapons: this.weapons.filter((w) => !w.exploded).map((w) => w.serialize()),
         decoys: this.decoys.map((decoy) => ({ ...decoy }))
@@ -232,6 +219,12 @@ class SubmarineWorld {
       const data = JSON.parse(raw);
       if (!data || !data.currentMission) return false;
 
+      const s = data.ownSub;
+      if (!s || !Number.isFinite(s.lat) || !Number.isFinite(s.lon) ||
+          !Number.isFinite(s.heading) || !Number.isFinite(s.depthM)) {
+        return false;
+      }
+
       this.currentMission = data.currentMission;
       this.simTimeSec = data.simTimeSec ?? 4 * 3600;
       this.selectedContactId = data.selectedContactId ?? null;
@@ -240,8 +233,7 @@ class SubmarineWorld {
       if (data.torpedoTubes) this.torpedoTubes = data.torpedoTubes;
       if (data.vlsTubes) this.vlsTubes = data.vlsTubes;
 
-      // Restore own submarine state
-      const s = data.ownSub;
+      // Restore own submarine state (older v2 saves remain supported).
       this.ownSub.reset(s.lat, s.lon, s.heading, s.depthM);
       Object.assign(this.ownSub, s);
       document.getElementById('input-order-hdg').value = Math.round(this.ownSub.orderedHeading);
