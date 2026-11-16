@@ -62,6 +62,14 @@ try {
 
   if (!existsSync(join(installDir, 'node_modules'))) {
     console.log('Installing HeadTTS dependencies (first run only)…');
+    // Replace the upstream POSIX-only mkdir postinstall with a portable Node.js
+    // equivalent so npm installation also works from Windows terminals.
+    const packagePath = join(installDir, 'package.json');
+    const packageJson = JSON.parse(readFileSync(packagePath, 'utf8'));
+    packageJson.scripts = packageJson.scripts || {};
+    packageJson.scripts.postinstall =
+      "node -e \"require('node:fs').mkdirSync('node_modules/@huggingface/transformers/.cache',{recursive:true})\"";
+    writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\\n', 'utf8');
     run('npm', ['install', '--omit=dev'], installDir);
   }
 
