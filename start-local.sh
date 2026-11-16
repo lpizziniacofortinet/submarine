@@ -11,12 +11,12 @@
 #
 set -Eeuo pipefail
 
-ROOT_DIR="$(cd "$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-SIM_PORT="\${SIM_PORT:-8080}"
+SIM_PORT="${SIM_PORT:-8080}"
 TTS_URL="http://127.0.0.1:8882"
-SIM_URL="http://127.0.0.1:\${SIM_PORT}"
+SIM_URL="http://127.0.0.1:${SIM_PORT}"
 NO_OPEN=0
 for arg in "$@"; do
   case "$arg" in
@@ -35,10 +35,10 @@ done
 TTS_PID=""
 WEB_PID=""
 TTS_OWNED=0
-LOG_DIR="\${HOME}/.submarine-simulator/logs"
+LOG_DIR="${HOME}/.submarine-simulator/logs"
 mkdir -p "$LOG_DIR"
-TTS_LOG="\${LOG_DIR}/kokoro-tts.log"
-WEB_LOG="\${LOG_DIR}/simulator-http.log"
+TTS_LOG="${LOG_DIR}/kokoro-tts.log"
+WEB_LOG="${LOG_DIR}/simulator-http.log"
 
 log() {
   printf '[SUBMARINE] %s\n' "$*"
@@ -63,7 +63,7 @@ cleanup() {
     wait "$TTS_PID" 2>/dev/null || true
   fi
   if [[ "$status" -ne 0 ]]; then
-    log "Stopped after an error. Logs: \${LOG_DIR}"
+    log "Stopped after an error. Logs: ${LOG_DIR}"
   else
     log "Local simulator services stopped."
   fi
@@ -90,13 +90,13 @@ tts_ready() {
   local response
   response="$(curl -sS --max-time 2 -X POST \
     -H 'Content-Type: application/json' \
-    -d '{}' "\${TTS_URL}/v1/hello" 2>/dev/null || true)"
+    -d '{}' "${TTS_URL}/v1/hello" 2>/dev/null || true)"
   [[ "$response" == HeadTTS* ]]
 }
 
 log "Checking local neural voice engine..."
 if tts_ready; then
-  log "HeadTTS is already running at \${TTS_URL}; reusing it."
+  log "HeadTTS is already running at ${TTS_URL}; reusing it."
 else
   log "Starting HeadTTS + Kokoro. First run downloads the model and may take several minutes."
   node "$ROOT_DIR/tts-server/start.mjs" >>"$TTS_LOG" 2>&1 &
@@ -105,10 +105,10 @@ else
 fi
 
 if curl -fsS --max-time 2 "$SIM_URL" -o /dev/null 2>/dev/null; then
-  fail "Port \${SIM_PORT} is already serving HTTP. Stop the other server or choose another port with SIM_PORT=8090."
+  fail "Port ${SIM_PORT} is already serving HTTP. Stop the other server or choose another port with SIM_PORT=8090."
 fi
 
-log "Starting simulator web server on \${SIM_URL}..."
+log "Starting simulator web server on ${SIM_URL}..."
 python3 -m http.server "$SIM_PORT" --bind 127.0.0.1 >>"$WEB_LOG" 2>&1 &
 WEB_PID=$!
 
@@ -120,7 +120,7 @@ until curl -fsS --max-time 2 "$SIM_URL" -o /dev/null 2>/dev/null; do
   fi
   web_attempt=$((web_attempt + 1))
   if [[ "$web_attempt" -ge 30 ]]; then
-    fail "The simulator HTTP server did not become ready on port \${SIM_PORT}."
+    fail "The simulator HTTP server did not become ready on port ${SIM_PORT}."
   fi
   sleep 1
 done
@@ -130,33 +130,33 @@ dots=0
 until tts_ready; do
   if [[ "$TTS_OWNED" -eq 1 ]] && ! kill -0 "$TTS_PID" 2>/dev/null; then
     tail -n 80 "$TTS_LOG" >&2 || true
-    fail "The local TTS server exited. Review \${TTS_LOG}."
+    fail "The local TTS server exited. Review ${TTS_LOG}."
   fi
   dots=$((dots + 1))
   if (( dots % 10 == 0 )); then
-    log "Still loading the local model; details are in \${TTS_LOG}."
+    log "Still loading the local model; details are in ${TTS_LOG}."
   fi
   sleep 2
 done
 
 log "Kokoro is ready."
-log "Simulator: \${SIM_URL}"
-log "Voice API: \${TTS_URL}"
-log "Logs: \${LOG_DIR}"
+log "Simulator: ${SIM_URL}"
+log "Voice API: ${TTS_URL}"
+log "Logs: ${LOG_DIR}"
 log "Keep this terminal open. Press Ctrl+C to stop the services started by this script."
 
 if [[ "$NO_OPEN" -eq 0 ]]; then
   case "$(uname -s)" in
-    Darwin) open "$SIM_URL" >/dev/null 2>&1 || log "Open \${SIM_URL} in your browser." ;;
+    Darwin) open "$SIM_URL" >/dev/null 2>&1 || log "Open ${SIM_URL} in your browser." ;;
     Linux)
       if command -v xdg-open >/dev/null 2>&1; then
-        xdg-open "$SIM_URL" >/dev/null 2>&1 || log "Open \${SIM_URL} in your browser."
+        xdg-open "$SIM_URL" >/dev/null 2>&1 || log "Open ${SIM_URL} in your browser."
       else
-        log "Open \${SIM_URL} in your browser."
+        log "Open ${SIM_URL} in your browser."
       fi
       ;;
     *)
-      log "Open \${SIM_URL} in your browser."
+      log "Open ${SIM_URL} in your browser."
       ;;
   esac
 fi
@@ -164,11 +164,11 @@ fi
 # Keep the launcher alive so Ctrl+C also stops the background services.
 while true; do
   if ! kill -0 "$WEB_PID" 2>/dev/null; then
-    fail "The simulator HTTP server stopped unexpectedly. Review \${WEB_LOG}."
+    fail "The simulator HTTP server stopped unexpectedly. Review ${WEB_LOG}."
   fi
   if [[ "$TTS_OWNED" -eq 1 ]] && ! kill -0 "$TTS_PID" 2>/dev/null; then
     tail -n 80 "$TTS_LOG" >&2 || true
-    fail "The local TTS server stopped unexpectedly. Review \${TTS_LOG}."
+    fail "The local TTS server stopped unexpectedly. Review ${TTS_LOG}."
   fi
   sleep 2
 done
