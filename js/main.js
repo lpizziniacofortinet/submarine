@@ -138,8 +138,9 @@ class SubmarineWorld {
     const loop = (now) => {
       const rawDt = Math.max(0, (now - lastTimestamp) / 1000.0);
       lastTimestamp = now;
-      this.simulationClock.advance(rawDt, (fixedDt) => {
-        this.stepSimulation(fixedDt * this.timeCompression, fixedDt);
+      const compression = Math.max(0, this.timeCompression);
+      this.simulationClock.advance(rawDt * compression, (fixedDt) => {
+        this.stepSimulation(fixedDt, compression > 0 ? fixedDt / compression : 0);
       });
       requestAnimationFrame(loop);
     };
