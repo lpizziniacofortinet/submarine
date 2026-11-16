@@ -30,6 +30,7 @@ class CombatLogger {
     }
 
     this.showPopup(station, message, cssClass, timeStr);
+    if (window.SubAudio) window.SubAudio.announce(station, message, cssClass);
   }
 
   showPopup(station, message, cssClass = 'conn', timeStr = '') {
@@ -1281,6 +1282,25 @@ class SubmarineWorld {
       e.target.textContent = on ? 'SND:ON' : 'SND:OFF';
       e.target.classList.toggle('active', on);
     });
+
+    const voiceBtn = document.getElementById('btn-voice-toggle');
+    if (voiceBtn) {
+      const voiceAvailable = window.SubAudio.speechSupported;
+      voiceBtn.disabled = !voiceAvailable;
+      const paintVoiceButton = (on) => {
+        voiceBtn.textContent = voiceAvailable ? (on ? 'VOX:ON' : 'VOX:OFF') : 'VOX:N/A';
+        voiceBtn.classList.toggle('active', Boolean(on));
+        voiceBtn.title = voiceAvailable
+          ? 'Toggle local crew voice communications (Web Speech API)'
+          : 'Speech synthesis is not available in this browser';
+      };
+      paintVoiceButton(window.SubAudio.voiceEnabled);
+      voiceBtn.addEventListener('click', () => {
+        const on = window.SubAudio.toggleVoice();
+        paintVoiceButton(on);
+        if (on) window.SubAudio.speak('Conn, radio check. How copy?', true);
+      });
+    }
 
     // Play crisp 90s CRT console beep on any button or tab click
     document.addEventListener('click', (e) => {
