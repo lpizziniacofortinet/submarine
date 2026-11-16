@@ -3,18 +3,23 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+const spokenUtterances = [];
+const mockSpeechSynthesis = {
+  paused: false,
+  getVoices() { return []; },
+  addEventListener() {},
+  cancel() {},
+  resume() { this.paused = false; },
+  speak(utterance) { spokenUtterances.push(utterance); }
+};
+
 global.window = {
   addEventListener() {},
   localStorage: {
     getItem() { return null; },
     setItem() {}
   },
-  speechSynthesis: {
-    getVoices() { return []; },
-    addEventListener() {},
-    cancel() {},
-    speak() {}
-  },
+  speechSynthesis: mockSpeechSynthesis,
   SpeechSynthesisUtterance: class SpeechSynthesisUtterance {
     constructor(text) { this.text = text; }
   },
@@ -51,4 +56,21 @@ test('radio formatting removes duplicate sonar prefix and expands common symbols
     'Sonar, Conn. TORPEDO IN THE WATER! Bearing 123 degrees!'
   );
   assert.match(VoiceEngine.formatRadioMessage('WEPS', 'Tube 1 at <= 45m'), /at or below/);
+});
+
+
+test('voice test sends an utterance synchronously to speechSynthesis', () => {
+  window.SubAudio.playRadioSquelch = () => {};
+  assert.equal(window.SubAudio.testVoice(), true);
+  assert.equal(spokenUtterances.length, 1);
+  assert.match(spokenUtterances[0].text, /USS Virginia/);
+  assert.equal(typeof spokenUtterances[0].onend, 'function');
+});
+
+test('voice selection falls back to an installed system voice when no English voice exists', () => {
+  mockSpeechSynthesis.getVoices = () => [
+    { name: 'French Default', lang: 'fr-FR', default: true, localService: true }
+  ];
+  window.SubAudio.refreshVoices();
+  assert.equal(window.SubAudio.preferredVoice.name, 'French Default');
 });
