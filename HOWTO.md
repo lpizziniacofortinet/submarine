@@ -270,7 +270,7 @@ Use the **SND** button to toggle procedural simulator sound effects and **VOX** 
 - VOX uses the browser's Web Speech API and selects the best available English system voice, preferring an installed/local voice where the browser exposes that information.
 - Important operational events are spoken: alerts, selected sonar reports, and significant weapons events. Routine console log entries remain on screen only.
 - Urgent alerts interrupt the current callout. Ordinary callouts are queued so they do not overlap.
-- Enabling VOX plays a short radio-check message. The opening/closing radio squelch is synthesized locally by the simulator's Web Audio engine.
+- Use **VOICE TEST** at any time to play a diagnostic radio check directly through the browser speech engine. This also confirms whether the selected voice actually starts. The opening/closing radio squelch is synthesized locally by the simulator's Web Audio engine.
 - Voice availability, accent, and naturalness depend on the browser and operating-system voice packs. Install an English voice in the OS settings for the best result.
 
 No external TTS service or API key is used. The radio squelch is an effect around the announcement; the browser-generated voice is not routed through a true narrowband radio filter. Some operating-system voice packs may need to be installed or downloaded separately.
