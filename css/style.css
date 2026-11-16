@@ -979,3 +979,25 @@ select.mil-select, input.mil-input {
   .scope-control-row { grid-template-columns: 1fr; justify-items: center; }
   .scope-system-readout { display: none; }
 }
+
+
+.scope-credit {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  min-height: 17px;
+  padding: 0 3px;
+  color: #718c9e;
+  font: 600 8px Arial, Helvetica, sans-serif;
+  letter-spacing: 0.3px;
+}
+.scope-credit strong {
+  color: #9bb9c6;
+  font-size: 8px;
+  letter-spacing: 0.7px;
+}
+.scope-credit strong[data-state="loading"] { color: #e0bd80; }
+.scope-credit strong[data-state="ready"],
+.scope-credit strong[data-state="cached"] { color: #9bd4be; }
+.scope-credit strong[data-state="offline"] { color: #d6a16b; }
