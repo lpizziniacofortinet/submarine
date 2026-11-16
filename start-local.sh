@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 #
-# Start the complete local submarine simulator:
-# - HeadTTS/Kokoro neural crew voice service (CPU, loopback only)
+# Start the local submarine simulator:
 # - Static HTTP server for the browser simulator
+# - Optional HeadTTS/Kokoro neural crew voice service (only with --with-voice)
 #
 # Usage:
 #   bash start-local.sh
