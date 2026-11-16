@@ -102,6 +102,10 @@ test('radio formatting removes duplicate sonar prefix and expands common symbols
   assert.match(engine.constructor.formatRadioMessage('WEPS', 'Tube 1 at <= 45m'), /at or below/);
 });
 
+test('crew voice is disabled by default until explicitly enabled', () => {
+  assert.equal(engine.voiceEnabled, false);
+});
+
 test('local neural voice profile is persisted and validated', () => {
   assert.equal(engine.setVoiceProfile('af_bella'), true);
   assert.equal(engine.voiceProfile, 'af_bella');
@@ -112,7 +116,7 @@ test('local neural voice profile is persisted and validated', () => {
 
 test('voice preference persists when disabled from simulator options', () => {
   assert.equal(engine.setVoiceEnabled(false), false);
-  assert.equal(storedSettings.get('ssn774_voice_enabled'), 'false');
+  assert.equal(storedSettings.get('ssn774_voice_enabled_v2'), 'false');
   assert.equal(engine.setVoiceEnabled(true), true);
   assert.equal(storedSettings.get('ssn774_voice_enabled'), 'true');
 });
