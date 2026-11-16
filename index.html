@@ -89,7 +89,7 @@
             <button class="mil-btn" id="btn-time-5x" title="5x Time Compression">5X</button>
             <button class="mil-btn" id="btn-time-10x" title="10x Time Compression">10X</button>
             <button class="mil-btn amber active" id="btn-audio-toggle" title="Toggle WebAudio Sound Effects">SND:ON</button>
-            <button class="mil-btn active" id="btn-voice-toggle" title="Toggle local crew voice communications">VOX:ON</button>
+            <button class="mil-btn" id="btn-voice-toggle" title="Toggle local crew voice communications">VOX:OFF</button>
             <button class="mil-btn" id="btn-voice-test" title="Play a local crew voice test">VOICE TEST</button>
             <button class="mil-btn" id="btn-open-options" title="Open simulator options">OPTIONS</button>
           </div>
@@ -849,7 +849,7 @@
               <strong>CREW VOICE COMMUNICATIONS</strong>
               <small>Enable spoken sonar, weapons, command and emergency callouts.</small>
             </span>
-            <input type="checkbox" id="opt-crew-voice-enabled" checked>
+            <input type="checkbox" id="opt-crew-voice-enabled">
           </label>
           <div class="option-setting-row">
             <span>
@@ -862,9 +862,9 @@
             </select>
           </div>
           <div id="opt-crew-voice-status" class="option-setting-status" role="status" aria-live="polite">
-            Local Kokoro voice engine: checking…
+            Crew voice communications are disabled by default.
           </div>
-          <p class="option-note">The voice profile is saved in this browser. Voice generation runs on the local HeadTTS/Kokoro server at 127.0.0.1:8882; no audio is sent to a cloud TTS provider. Procedural sound effects (SND) remain independent from VOX.</p>
+          <p class="option-note">Crew voice is optional and disabled by default. Start the simulator with --with-voice to launch the local HeadTTS/Kokoro server, then enable VOX here. No audio is sent to a cloud TTS provider. Procedural sound effects (SND) remain independent from VOX.</p>
         </div>
       </div>
     </div>
