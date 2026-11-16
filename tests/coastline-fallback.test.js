@@ -40,6 +40,25 @@ test('fallback profile includes the Provençal coast from the Toulon departure s
   assert.ok(visibleBearings.some((bearing) => bearing <= 30 || bearing >= 330));
 });
 
+test('DEM profile keeps local coastline rays where its terrain samples contain no land', () => {
+  const fallback = CoastlineModel.buildFallbackProfile(43.9, 10.2);
+  const emptyDem = {
+    azimuthStepDeg: 5,
+    source: 'Copernicus DEM test profile',
+    rays: fallback.rays.map((ray) => ({
+      ...ray,
+      angleDeg: CoastlineModel.horizonDipDegrees(),
+      rangeKm: 0,
+      elevationM: 0,
+      hasLand: false
+    }))
+  };
+  const merged = CoastlineModel.mergeProfiles(emptyDem, fallback);
+  assert.equal(merged.fallback, false);
+  assert.equal(merged.hybrid, true);
+  assert.ok(merged.rays.some((ray) => ray && ray.hasLand));
+});
+
 test('local land profile is available immediately while the DEM request is loading', () => {
   const model = new CoastlineModel();
   model.updatePosition(43.9, 10.2);
