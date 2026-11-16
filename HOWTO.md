@@ -10,7 +10,7 @@ This guide explains the controls and the main gameplay loop. The simulator uses 
 
 1. [Start a patrol](#1-start-a-patrol)
 2. [Choose a base and mission](#2-choose-a-base-and-mission)
-3. [The seven operator stations](#3-the-six-operator-stations)
+3. [The seven operator stations](#3-the-seven-operator-stations)
 4. [Sonar, classification, and TMA](#4-sonar-classification-and-tma)
 5. [Contacts, AIS, and marine life](#5-contacts-ais-and-marine-life)
 6. [Acoustic environment](#6-acoustic-environment)
