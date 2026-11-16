@@ -27,7 +27,7 @@
     try {
       const saved = window.localStorage?.getItem(VOICE_STORAGE_KEY);
       return Object.prototype.hasOwnProperty.call(VOICES, saved) ? saved : 'am_fenrir';
-    } catch (_) { return 'am_michael'; }
+    } catch (_) { return 'am_fenrir'; }
   })();
   audio.ttsBaseUrl = DEFAULT_BASE_URL;
   audio.ttsOnline = false;
