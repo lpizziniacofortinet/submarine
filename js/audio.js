@@ -1,6 +1,6 @@
 /**
  * ============================================================================
- * ENHANCED PROCEDURAL WEB AUDIO & HYDROPHONE SYNTHESIZER + CREW VOICE TTS
+ * ENHANCED PROCEDURAL WEB AUDIO & HYDROPHONE SYNTHESIZER
  * Full 90s submarine soundscape:
  * - Auto-unlocks on first click/keypress
  * - Console switch clicks & CRT terminal beeps
@@ -9,7 +9,6 @@
  * - Diving Klaxon ("AWOOGA!"), Red Alert, Reactor SCRAM alarm
  * - Torpedo Tube flood hiss, Water-Ram launch thump, VLS Missile rocket roar
  * - 3.5 kHz Active Sonar Ping + hull reverb + timed echoes
- * - Naval Crew Voice Callouts (Web Speech API)
  * ============================================================================
  */
 
@@ -18,7 +17,6 @@ class SubAudioEngine {
     this.ctx = null;
     this.masterGain = null;
     this.enabled = true;
-    this.voiceEnabled = true;
     this.hydrophoneEnabled = true;
     this.volume = 0.75;
     this.initialized = false;
@@ -39,30 +37,6 @@ class SubAudioEngine {
     // Torpedo whine oscillator
     this.torpOsc = null;
     this.torpGain = null;
-
-    this.speechSynthesis = window.speechSynthesis || null;
-    this.speechSupported = Boolean(this.speechSynthesis && window.SpeechSynthesisUtterance);
-    this.voiceQueue = [];
-    this.voiceSpeaking = false;
-    this.currentUtterance = null;
-    this.voiceGeneration = 0;
-    this.availableVoices = [];
-    this.preferredVoice = null;
-    this.voiceRate = 0.94;
-    this.voicePitch = 0.82;
-    this.voiceLevel = 0.92;
-    try {
-      this.voiceEnabled = this.speechSupported &&
-        window.localStorage?.getItem('ssn774_voice_enabled') !== 'false';
-    } catch (e) {
-      this.voiceEnabled = this.speechSupported;
-    }
-    this.refreshVoices();
-    if (this.speechSynthesis?.addEventListener) {
-      this.speechSynthesis.addEventListener('voiceschanged', () => this.refreshVoices());
-    } else if (this.speechSynthesis) {
-      this.speechSynthesis.onvoiceschanged = () => this.refreshVoices();
-    }
 
     this.bindGlobalUnlock();
   }
@@ -122,184 +96,6 @@ class SubAudioEngine {
    * Select a system-provided English voice. Prefer an installed/local en-US voice
    * and voices labelled natural/neural when the operating system exposes them.
    */
-  refreshVoices() {
-    if (!this.speechSynthesis) return [];
-    try {
-      this.availableVoices = this.speechSynthesis.getVoices() || [];
-    } catch (e) {
-      this.availableVoices = [];
-    }
-
-    const score = (voice) => {
-      const lang = String(voice.lang || '').toLowerCase();
-      const name = String(voice.name || '').toLowerCase();
-      let value = 0;
-      if (lang === 'en-us') value += 100;
-      else if (lang.startsWith('en-')) value += 65;
-      else if (lang === 'en') value += 55;
-      if (voice.localService) value += 35;
-      if (voice.default) value += 5;
-      if (/natural|neural|premium|enhanced/.test(name)) value += 45;
-      if (/alex|daniel|fred|guy|david|mark|james|tom|aaron|christopher/.test(name)) value += 12;
-      return value;
-    };
-
-    this.preferredVoice = this.availableVoices
-      .filter((voice) => String(voice.lang || '').toLowerCase().startsWith('en'))
-      .sort((a, b) => score(b) - score(a))[0] || null;
-    return this.availableVoices;
-  }
-
-  static shouldAnnounce(station, message, cssClass = 'conn') {
-    const text = String(message || '');
-    if (cssClass === 'alert') return true;
-    if (station === 'SONAR' && cssClass === 'sonar' &&
-        /active ping|classified|matched demon|noisemaker|decoy/i.test(text)) return true;
-    if (station === 'WEPS' && cssClass === 'weps' &&
-        /flooding|fired|broached|deployed|reloaded/i.test(text)) return true;
-    if (station === 'CONN' && /^(DIVE!|MISSION ACCOMPLISHED)/i.test(text)) return true;
-    return false;
-  }
-
-  static formatRadioMessage(station, message) {
-    let body = String(message || '')
-      .replace(/<[^>]*>/g, ' ')
-      .replace(/^\s*Conn,\s*Sonar[.!:,]?\s*/i, '')
-      .replace(/\s+/g, ' ')
-      .trim()
-      .replace(/<=/g, ' at or below ')
-      .replace(/>=/g, ' at or above ')
-      .replace(/°/g, ' degrees ')
-      .replace(/\bKT\b/gi, ' knots ')
-      .replace(/\s+/g, ' ')
-      .replace(/\s+([,!.?])/g, '$1');
-    const callsign = station === 'SONAR' ? 'Sonar, Conn.' :
-      station === 'WEPS' ? 'Weapons, Conn.' :
-      station === 'ENG' ? 'Engineering, Conn.' : 'Conn.';
-    return `${callsign} ${body}`.slice(0, 260);
-  }
-
-  announce(station, message, cssClass = 'conn') {
-    if (!SubAudioEngine.shouldAnnounce(station, message, cssClass)) return false;
-    const radioMessage = SubAudioEngine.formatRadioMessage(station, message);
-    this.speak(radioMessage, cssClass === 'alert');
-    return true;
-  }
-
-  setVoiceEnabled(enabled) {
-    if (!this.speechSupported) {
-      this.voiceEnabled = false;
-      return false;
-    }
-    this.voiceEnabled = Boolean(enabled);
-    try {
-      window.localStorage?.setItem('ssn774_voice_enabled', String(this.voiceEnabled));
-    } catch (e) {
-      // Voice still works for this session when storage is unavailable.
-    }
-    if (!this.voiceEnabled) {
-      this.voiceGeneration++;
-      this.voiceQueue.length = 0;
-      this.voiceSpeaking = false;
-      this.currentUtterance = null;
-      this.speechSynthesis.cancel();
-    }
-    return this.voiceEnabled;
-  }
-
-  toggleVoice() {
-    return this.setVoiceEnabled(!this.voiceEnabled);
-  }
-
-  playRadioSquelch(opening = true) {
-    if (!this.enabled) return;
-    this.init();
-    if (!this.ctx) return;
-
-    const now = this.ctx.currentTime;
-    const duration = opening ? 0.065 : 0.045;
-    const length = Math.max(1, Math.floor(this.ctx.sampleRate * duration));
-    const buffer = this.ctx.createBuffer(1, length, this.ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < length; i++) data[i] = (Math.random() * 2 - 1) * 0.7;
-
-    const source = this.ctx.createBufferSource();
-    source.buffer = buffer;
-    const filter = this.ctx.createBiquadFilter();
-    filter.type = 'bandpass';
-    filter.frequency.value = opening ? 1550 : 950;
-    filter.Q.value = 0.9;
-    const gain = this.ctx.createGain();
-    const peak = opening ? 0.045 : 0.032;
-    gain.gain.setValueAtTime(0.0001, now);
-    gain.gain.linearRampToValueAtTime(peak, now + 0.009);
-    gain.gain.exponentialRampToValueAtTime(0.0001, now + duration);
-
-    source.connect(filter);
-    filter.connect(gain);
-    gain.connect(this.masterGain);
-    source.start(now);
-    source.stop(now + duration + 0.005);
-  }
-
-  processVoiceQueue() {
-    if (!this.voiceEnabled || !this.speechSupported || this.voiceSpeaking || !this.voiceQueue.length) return;
-
-    const item = this.voiceQueue.shift();
-    const generation = this.voiceGeneration;
-    const utterance = new window.SpeechSynthesisUtterance(item.text);
-    utterance.lang = 'en-US';
-    utterance.rate = this.voiceRate;
-    utterance.pitch = this.voicePitch;
-    utterance.volume = this.voiceLevel;
-    if (this.preferredVoice) utterance.voice = this.preferredVoice;
-
-    const finish = () => {
-      if (generation !== this.voiceGeneration) return;
-      this.voiceSpeaking = false;
-      this.currentUtterance = null;
-      this.playRadioSquelch(false);
-      this.processVoiceQueue();
-    };
-    utterance.onend = finish;
-    utterance.onerror = finish;
-
-    this.voiceSpeaking = true;
-    this.currentUtterance = utterance;
-    this.playRadioSquelch(true);
-    window.setTimeout(() => {
-      if (generation !== this.voiceGeneration || !this.voiceEnabled) return;
-      try {
-        this.speechSynthesis.speak(utterance);
-      } catch (e) {
-        finish();
-      }
-    }, 75);
-  }
-
-  /**
-   * Speak only selected operational dispatches. Routine console chatter remains
-   * visual, urgent alerts flush the queue, and ordinary callouts are serialized.
-   */
-  speak(text, urgent = false) {
-    if (!this.voiceEnabled || !this.speechSupported || !text) return false;
-    const cleanText = String(text).replace(/\s+/g, ' ').trim().slice(0, 260);
-    if (!cleanText) return false;
-
-    if (urgent) {
-      this.voiceGeneration++;
-      this.voiceQueue.length = 0;
-      this.voiceSpeaking = false;
-      this.currentUtterance = null;
-      this.speechSynthesis.cancel();
-    }
-
-    this.voiceQueue.push({ text: cleanText, urgent: Boolean(urgent) });
-    while (this.voiceQueue.length > 6) this.voiceQueue.shift();
-    this.processVoiceQueue();
-    return true;
-  }
-
   setupContinuousLoops() {
     if (!this.ctx) return;
 
