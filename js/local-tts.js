@@ -103,7 +103,7 @@
 
   audio.synthesizeLocalVoice = async function synthesizeLocalVoice(text) {
     const controller = typeof AbortController !== 'undefined' ? new AbortController() : null;
-    const timeout = controller ? window.setTimeout(() => controller.abort(), 120000) : null;
+    const timeout = controller ? window.setTimeout(() => controller.abort(), 300000) : null;
     try {
       const response = await fetch(this.ttsBaseUrl + '/v1/synthesize', {
         method: 'POST',
