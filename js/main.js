@@ -369,6 +369,7 @@ class SubmarineWorld {
 
     // 2. Step S9G Nuclear Reactor & Steam Plant
     const rxOut = this.reactor.update(dt, this.ownSub.orderedSpeedKts, this.ownSub.depthM);
+    rxOut.effectiveOrderedSpeedKts *= 0.55 + 0.45 * (this.ownSub.damageControl.getSystemHealth('reactor') / 100);
 
     // 3. Step Submarine Hydrodynamics, Ballast & Own Acoustics
     this.ownSub.update(dt, rxOut, this.currentSeafloorM, this.currentThermoclineM);
