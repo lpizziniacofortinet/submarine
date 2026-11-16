@@ -608,7 +608,14 @@ class StationRenderers {
     });
 
     const sel = world.getSelectedContact();
-    if (!sel || !sel.detected) return;
+    if (!sel || !sel.detected || sel.sunk) {
+      ctx.fillStyle = '#5a8c6b';
+      ctx.font = '10px Courier New';
+      ctx.textAlign = 'center';
+      ctx.fillText('NO TRACK SELECTED', cx, cy + 4);
+      ctx.textAlign = 'start';
+      return;
+    }
 
     const brgRad = ((sel.lastTrueBrg - 90) * Math.PI) / 180;
     const distPx = Math.min(72, sel.estRangeNm * 8.5);
