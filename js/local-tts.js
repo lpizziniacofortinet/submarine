@@ -14,11 +14,8 @@
   const VOICE_STORAGE_KEY = 'ssn774_voice_profile';
   const ENABLED_STORAGE_KEY = 'ssn774_voice_enabled';
   const VOICES = Object.freeze({
-    am_michael: 'Michael — American male',
     am_fenrir: 'Fenrir — American male',
-    am_onyx: 'Onyx — American male',
-    af_bella: 'Bella — American female',
-    af_sarah: 'Sarah — American female'
+    af_bella: 'Bella — American female'
   });
 
   audio.speechSupported = typeof fetch === 'function';
@@ -29,7 +26,7 @@
   audio.voiceProfile = (() => {
     try {
       const saved = window.localStorage?.getItem(VOICE_STORAGE_KEY);
-      return Object.prototype.hasOwnProperty.call(VOICES, saved) ? saved : 'am_michael';
+      return Object.prototype.hasOwnProperty.call(VOICES, saved) ? saved : 'am_fenrir';
     } catch (_) { return 'am_michael'; }
   })();
   audio.ttsBaseUrl = DEFAULT_BASE_URL;
