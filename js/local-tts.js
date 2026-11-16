@@ -12,7 +12,7 @@
 
   const DEFAULT_BASE_URL = 'http://127.0.0.1:8882';
   const VOICE_STORAGE_KEY = 'ssn774_voice_profile';
-  const ENABLED_STORAGE_KEY = 'ssn774_voice_enabled';
+  const ENABLED_STORAGE_KEY = 'ssn774_voice_enabled_v2';
   const VOICES = Object.freeze({
     am_fenrir: 'Fenrir — American male',
     af_bella: 'Bella — American female'
@@ -20,8 +20,8 @@
 
   audio.speechSupported = typeof fetch === 'function';
   audio.voiceEnabled = (() => {
-    try { return window.localStorage?.getItem(ENABLED_STORAGE_KEY) !== 'false'; }
-    catch (_) { return true; }
+    try { return window.localStorage?.getItem(ENABLED_STORAGE_KEY) === 'true'; }
+    catch (_) { return false; }
   })();
   audio.voiceProfile = (() => {
     try {
@@ -273,6 +273,7 @@
       profileSelect.value = audio.voiceProfile;
       profileSelect.addEventListener('change', () => audio.setVoiceProfile(profileSelect.value));
     }
-    audio.checkLocalTts();
+    if (audio.voiceEnabled) audio.checkLocalTts();
+    else notify('off', 'Crew voice communications disabled by default');
   });
 })();
