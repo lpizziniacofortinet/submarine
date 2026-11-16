@@ -20,7 +20,8 @@ This guide explains the controls and the main gameplay loop. The simulator uses 
 10. [Periscope, radar, and ESM](#10-periscope-radar-and-esm)
 11. [Save, resume, and export](#11-save-resume-and-export)
 12. [Keyboard shortcuts](#12-keyboard-shortcuts)
-13. [Model limitations](#13-model-limitations)
+13. [Damage control](#13-damage-control)
+14. [Model limitations](#14-model-limitations)
 
 ---
 
@@ -230,7 +231,19 @@ Saves are local to the browser profile and origin. Clearing site data, changing 
 
 The keyboard shortcuts are ignored while an input or select field has focus. Some controls are available only through their on-screen buttons.
 
-## 13. Model limitations
+## 13. Damage control
+
+Open **F7 — DAMAGE CONTROL** to inspect the longitudinal compartment diagram, pressure-hull integrity, average flooding, and derived subsystem health.
+
+- Hostile torpedo impacts damage a compartment selected from the incoming bearing and introduce flooding.
+- Grounding applies bow-compartment wear; operation beyond test depth applies operations-compartment wear.
+- Damage degrades modeled propulsion, steering, ballast response, reactor-limited speed, and bow-array sonar gain.
+- Flooding adds simulated weight and can affect depth control. Start the dewatering pumps to reduce flooding; pumping does not restore structural integrity.
+- Damage persists in the patrol save.
+
+The compartment layout and casualty effects are abstract gameplay mechanics, not a real Virginia-class internal arrangement or validated damage-control model.
+
+## 14. Model limitations
 
 The application is a hobby simulation with realistic presentation, not a certified trainer or operational tool. Important simplifications include:
 
