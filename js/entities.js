@@ -563,13 +563,15 @@ class WeaponEntity {
         ownSub.hullIntegrityPct = Math.max(0, ownSub.hullIntegrityPct - 42);
         const incomingBearing = window.Bathymetry.bearingDeg(ownSub.lat, ownSub.lon, this.lat, this.lon);
         const relativeBearing = (incomingBearing - ownSub.heading + 360) % 360;
-        const hitZone = relativeBearing < 45 || relativeBearing >= 315
+        const hitZone = relativeBearing < 36 || relativeBearing >= 324
           ? 'bow'
-          : relativeBearing < 135
+          : relativeBearing < 108
           ? 'operations'
-          : relativeBearing < 225
-          ? 'stern'
-          : 'engineering';
+          : relativeBearing < 180
+          ? 'reactor'
+          : relativeBearing < 252
+          ? 'engineering'
+          : 'stern';
         ownSub.damageControl.applyHit(hitZone, 42, 24);
         ownSub.addAcousticTransient(50);
         if (window.GameLogger) {
