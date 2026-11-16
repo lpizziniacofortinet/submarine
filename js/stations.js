@@ -28,7 +28,14 @@ class StationRenderers {
     this.scopeThermal = false;
     this.scopeZoom = 1.5;
     this.coastlineModel = window.CoastlineModel ? new window.CoastlineModel() : null;
-    this.scopeVisibilityKm = 45;
+    this.scopeWeatherIndex = 0;
+    this.scopeWeatherModes = [
+      { name: 'CLEAR', visibilityKm: 55, hazeAlpha: 0.015 },
+      { name: 'HAZE', visibilityKm: 24, hazeAlpha: 0.105 },
+      { name: 'FOG', visibilityKm: 7, hazeAlpha: 0.27 }
+    ];
+    this.scopeVisibilityKm = this.scopeWeatherModes[0].visibilityKm;
+    this.scopeHazeAlpha = this.scopeWeatherModes[0].hazeAlpha;
 
 
     // Radar sweep angle
@@ -978,6 +985,14 @@ class StationRenderers {
     ctx.fillText(`DIESEL: ${rx.dieselRunning ? 'RUNNING' : 'STANDBY'}`, turbX + 10, batY + 50);
   }
 
+  cycleScopeWeather() {
+    this.scopeWeatherIndex = (this.scopeWeatherIndex + 1) % this.scopeWeatherModes.length;
+    const mode = this.scopeWeatherModes[this.scopeWeatherIndex];
+    this.scopeVisibilityKm = mode.visibilityKm;
+    this.scopeHazeAlpha = mode.hazeAlpha;
+    return mode.name;
+  }
+
   /**
    * Renders Station 6 Photonics Periscope & Radar/ESM PPI Scope
    */
@@ -999,15 +1014,15 @@ class StationRenderers {
       const w = displayW;
       const h = displayH;
       const sub = world.ownSub;
-      if (this.coastlineModel) this.coastlineModel.updatePosition(sub.lat, sub.lon);
+      const raised = Boolean(sub.periscopeRaised && sub.depthM <= 20.5);
+      if (raised && this.coastlineModel) this.coastlineModel.updatePosition(sub.lat, sub.lon);
       const terrainProfile = this.coastlineModel ? this.coastlineModel.profile : null;
       const terrainStatus = this.coastlineModel ? this.coastlineModel.status : 'UNAVAILABLE';
       const terrainStatusEl = document.getElementById('scope-terrain-status');
       if (terrainStatusEl) {
-        terrainStatusEl.textContent = 'TERRAIN DATA: ' + terrainStatus;
-        terrainStatusEl.dataset.state = String(terrainStatus).toLowerCase();
+        terrainStatusEl.textContent = raised ? 'TERRAIN DATA: ' + terrainStatus : 'TERRAIN DATA: STANDBY';
+        terrainStatusEl.dataset.state = raised ? String(terrainStatus).toLowerCase() : 'standby';
       }
-      const raised = Boolean(sub.periscopeRaised && sub.depthM <= 20.5);
       const thermal = Boolean(this.scopeThermal);
       const liveMark = scopeCanvas.parentElement?.querySelector('.scope-live-mark');
       if (liveMark) {
@@ -1015,6 +1030,7 @@ class StationRenderers {
         liveMark.lastChild.textContent = thermal ? ' FLIR SENSOR' : ' EO SENSOR';
       }
       const zoom = this.scopeZoom || 1.5;
+      const fovDeg = 48 / zoom;
       const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
       const simSeconds = Number.isFinite(world.simTimeSec) ? world.simTimeSec : 0;
       const simHours = ((simSeconds / 3600) % 24 + 24) % 24;
@@ -1219,6 +1235,16 @@ class StationRenderers {
           ctx.stroke();
         }
 
+        // Simple optical attenuation presets: clear, haze and fog.
+        if (this.scopeHazeAlpha > 0) {
+          const weatherHaze = ctx.createLinearGradient(0, horizonY - 45, 0, h);
+          weatherHaze.addColorStop(0, 'rgba(190, 204, 207, ' + (this.scopeHazeAlpha * 0.42) + ')');
+          weatherHaze.addColorStop(0.48, 'rgba(190, 204, 207, ' + this.scopeHazeAlpha + ')');
+          weatherHaze.addColorStop(1, 'rgba(190, 204, 207, ' + (this.scopeHazeAlpha * 0.28) + ')');
+          ctx.fillStyle = weatherHaze;
+          ctx.fillRect(0, horizonY - 45, w, h - horizonY + 45);
+        }
+
         const glowX = w * (0.70 + Math.sin((this.scopeBearing * Math.PI) / 180) * 0.08);
         const glowY = horizonY - 30;
         const glow = ctx.createRadialGradient(glowX, glowY, 2, glowX, glowY, 90);
@@ -1235,7 +1261,6 @@ class StationRenderers {
         ctx.fillRect(glowX - 30, horizonY, 60, h - horizonY);
 
         // Surface contacts in the optical field of view.
-        const fovDeg = 48 / zoom;
         const visibleContacts = [];
         for (const contact of world.contacts) {
           if (contact.sunk || contact.depthM > 5) continue;
@@ -1257,6 +1282,8 @@ class StationRenderers {
           const right = sx + shipWidth / 2;
           const hullColor = thermal ? '#e7ece8' : (daylight > 0.25 ? '#263b46' : '#111f2b');
           const detailColor = thermal ? '#f7f8f3' : (daylight > 0.25 ? '#354d5a' : '#263e4c');
+          const contactVisibility = clamp(1 - (rangeNm / this.scopeVisibilityKm) * 0.74, 0.18, 1);
+          ctx.globalAlpha = contactVisibility;
 
           ctx.fillStyle = hullColor;
           ctx.beginPath();
@@ -1287,6 +1314,7 @@ class StationRenderers {
           ctx.stroke();
 
           visibleContacts.push({ contact, sx, shipY, shipHeight, rangeNm, bearing });
+          ctx.globalAlpha = 1;
         }
 
         visibleContacts.forEach(({ contact, sx, shipY, shipHeight, rangeNm }) => {
@@ -1304,6 +1332,7 @@ class StationRenderers {
           ctx.lineTo(sx, shipY - 2);
           ctx.stroke();
         });
+        ctx.globalAlpha = 1;
 
         const vignette = ctx.createRadialGradient(w / 2, h / 2, h * 0.18, w / 2, h / 2, Math.max(w, h) * 0.72);
         vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
@@ -1384,7 +1413,8 @@ class StationRenderers {
         drawText('MAST  EXTENDED', 14, h - 14, 9, '#a9d4c9', 700);
         drawText(`DEPTH ${sub.depthM.toFixed(1)} m`, w * 0.36, h - 14, 9, '#c5d4dc', 600, 'center');
         drawText(`OWN HDG ${String(Math.round(sub.heading || 0)).padStart(3, '0')}°`, w * 0.64, h - 14, 9, '#c5d4dc', 600, 'center');
-        drawText('VIS ' + this.scopeVisibilityKm + ' KM', w * 0.84, h - 14, 9, '#a9bfcb', 600, 'center');
+        drawText(this.scopeWeatherModes[this.scopeWeatherIndex].name + ' / ' + this.scopeVisibilityKm + ' KM',
+          w * 0.83, h - 14, 8, '#a9bfcb', 600, 'center');
         drawText(thermal ? 'IR SENSOR' : 'OPTICAL SENSOR', w - 14, h - 14, 9, '#e4c58f', 700, 'right');
         drawCornerFrame('rgba(201, 220, 231, 0.52)');
       }
