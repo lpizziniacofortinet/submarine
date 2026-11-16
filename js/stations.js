@@ -25,7 +25,7 @@ class StationRenderers {
 
     // Periscope state
     this.scopeBearing = 90;
-    this.scopeThermal = true;
+    this.scopeThermal = false;
     this.scopeZoom = 1.5;
 
     // Radar sweep angle
