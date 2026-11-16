@@ -1291,7 +1291,7 @@ class SubmarineWorld {
         voiceBtn.classList.toggle('active', Boolean(on));
         voiceBtn.disabled = !voiceAvailable;
         voiceBtn.title = voiceAvailable
-          ? 'Toggle local crew voice communications (Web Speech API)'
+          ? 'Toggle local neural crew voice communications (Kokoro TTS)'
           : 'Speech synthesis is not available in this browser';
       }
       if (voiceOptionCheckbox) {
@@ -1316,6 +1316,7 @@ class SubmarineWorld {
         voiceTestBtn.title = detail || 'Test local crew voice playback';
       }
       if (voiceOptionStatus && detail) voiceOptionStatus.textContent = detail;
+      if (voiceOptionStatus) voiceOptionStatus.dataset.state = state;
     };
 
     if (voiceBtn) {
