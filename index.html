@@ -1,0 +1,796 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SSN-774 VIRGINIA CLASS // AN/BYG-1 COMBAT CONTROL SYSTEM</title>
+  <!-- Leaflet CSS for Real Geographic & Bathymetric Charts -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="crt-effect">
+  <div id="app-container">
+    <!-- TOP TELEMETRY & SHIP STATUS HUD -->
+    <header id="top-hud">
+      <!-- Box 1: Boat Identity & Mission Clock -->
+      <div class="hud-box">
+        <div class="hud-title">
+          <span>USS VIRGINIA (SSN-774)</span>
+          <span id="hud-sim-rate" style="color:var(--crt-amber)">1x REALTIME</span>
+        </div>
+        <div class="hud-metrics">
+          <div class="metric-item">
+            <span class="metric-label">ZULU TIME</span>
+            <span class="metric-val cyan" id="hud-clock">04:15:00Z</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">HULL INTEGRITY</span>
+            <span class="metric-val" id="hud-hull">100%</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">BATTERY</span>
+            <span class="metric-val" id="hud-battery">100%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Box 2: Primary Navigation, Depth, Bathymetry & Acoustics -->
+      <div class="hud-box">
+        <div class="hud-title">
+          <span id="hud-latlon">LAT 20°15.40'N | LON 121°10.20'E (LUZON STRAIT)</span>
+          <span id="hud-thermocline">THERMAL LAYER: 115m</span>
+        </div>
+        <div class="hud-metrics">
+          <div class="metric-item">
+            <span class="metric-label">HEADING (ORD)</span>
+            <span class="metric-val" id="hud-hdg">090° (090°)</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">SPEED (ORD)</span>
+            <span class="metric-val" id="hud-spd">8.0 KT (8 KT)</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">KEEL DEPTH (ORD)</span>
+            <span class="metric-val cyan" id="hud-depth">60m (60m)</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">SEAFLOOR DEPTH</span>
+            <span class="metric-val amber" id="hud-seafloor">1420m</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">PITCH / BUOYANCY</span>
+            <span class="metric-val" id="hud-pitch">+0.0° / NEUTRAL</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">OWN NOISE (CAV)</span>
+            <span class="metric-val" id="hud-noise">92 dB (MAX 16KT)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Box 3: S9G Nuclear Reactor & Sim Controls -->
+      <div class="hud-box">
+        <div class="hud-title">
+          <span>S9G PWR NUCLEAR PLANT</span>
+          <span id="hud-rx-status" style="color:var(--crt-green)">CRITICAL // NORMAL</span>
+        </div>
+        <div class="hud-metrics">
+          <div class="metric-item">
+            <span class="metric-label">RX POWER</span>
+            <span class="metric-val amber" id="hud-rx-power">28.4%</span>
+          </div>
+          <div class="metric-item">
+            <span class="metric-label">T-AVG / PRESS</span>
+            <span class="metric-val" id="hud-rx-temp">286°C / 2250</span>
+          </div>
+          <div style="display:flex; gap:3px;">
+            <button class="mil-btn" id="btn-time-1x" title="1x Real Time">1X</button>
+            <button class="mil-btn" id="btn-time-2x" title="2x Time Compression">2X</button>
+            <button class="mil-btn" id="btn-time-5x" title="5x Time Compression">5X</button>
+            <button class="mil-btn" id="btn-time-10x" title="10x Time Compression">10X</button>
+            <button class="mil-btn amber active" id="btn-audio-toggle" title="Toggle WebAudio Sound Effects">SND:ON</button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <!-- STATION SELECTOR BAR & MASTER WARNING ANNUNCIATORS -->
+    <nav id="station-nav">
+      <button class="station-tab active" data-station="tactical">[F1] GEO / TACTICAL PLOT</button>
+      <button class="station-tab" data-station="sonar">[F2] SONAR &amp; TMA</button>
+      <button class="station-tab" data-station="weapons">[F3] FIRE CONTROL (WEPS)</button>
+      <button class="station-tab" data-station="maneuvering">[F4] MANEUVERING &amp; TRIM</button>
+      <button class="station-tab" data-station="reactor">[F5] S9G NUCLEAR REACTOR</button>
+      <button class="station-tab" data-station="periscope">[F6] PERISCOPE / RADAR / ESM</button>
+      <button class="mil-btn amber" id="btn-open-briefing" style="margin-left:6px;">NATO BASE / MISSION</button>
+      <button class="mil-btn" id="btn-quick-save" title="Save Patrol Progress to Browser Storage">SAVE</button>
+
+      <div class="nav-spacer"></div>
+
+      <!-- Master Warning Annunciator Lights -->
+      <div id="annunciator-strip">
+        <div class="annunciator" id="ann-cavitating">CAVITATION</div>
+        <div class="annunciator" id="ann-thermocline">BELOW LAYER</div>
+        <div class="annunciator" id="ann-esm">ESM DETECT</div>
+        <div class="annunciator" id="ann-active-sonar">ACTIVE PING</div>
+        <div class="annunciator" id="ann-torpedo">TORPEDO IN WATER</div>
+        <div class="annunciator" id="ann-depth">TEST DEPTH</div>
+        <div class="annunciator" id="ann-scram">RX SCRAM</div>
+      </div>
+    </nav>
+
+    <!-- MAIN WORKSPACE: LEFT ACTIVE STATION + RIGHT CONN SIDEBAR -->
+    <main id="main-workspace">
+      <div id="station-viewport">
+
+        <!-- ================================================================
+             STATION 1: GEOGRAPHIC & TACTICAL NAV PLOT (AN/BYG-1 TACPLOT)
+             ================================================================ -->
+        <section id="screen-tactical" class="station-screen active">
+          <div id="map-wrapper">
+            <div id="map-controls-bar">
+              <button class="mil-btn active" id="btn-map-follow">FOLLOW SUB</button>
+              <button class="mil-btn" id="btn-map-waypoint">SET COURSE (CLICK MAP)</button>
+              <button class="mil-btn" id="btn-map-layer-ocean">NOAA/ESRI OCEAN</button>
+              <button class="mil-btn" id="btn-map-layer-dark">CRT DARK VECTOR</button>
+              <button class="mil-btn" id="btn-map-bathy-probe">PROBE BATHYMETRY</button>
+              <button class="mil-btn amber" id="btn-ping-active-quick">ACTIVE PING (3.5kHz)</button>
+            </div>
+            <div id="leaflet-map"></div>
+            <canvas id="tactical-overlay-canvas"></canvas>
+            <div id="map-cursor-readout">
+              CURSOR: --°--'N --°--'E | BRG: ---° | RNG: --.- NM | EST DEPTH: ----m
+            </div>
+          </div>
+
+          <!-- Tactical Right Subpanel: Mission Objectives & TMA Summary -->
+          <div class="crt-panel" style="justify-content:space-between; overflow-y:auto;">
+            <div>
+              <div class="panel-header">
+                <span>MISSION ORDERS &amp; INTEL</span>
+                <span id="tac-mission-code">OP-IRON-CURTAIN</span>
+              </div>
+              <div id="tac-objectives-list" style="font-size:11px; margin-bottom:8px; display:flex; flex-direction:column; gap:4px;"></div>
+
+              <div class="panel-header" style="margin-top:8px;">
+                <span>ENVIRONMENT &amp; BATHYMETRY</span>
+                <span id="bathy-source-badge" style="color:var(--crt-cyan); font-size:9px;">LIVE API+GRID</span>
+              </div>
+              <div class="kv-row"><span class="kv-key">WATER DEPTH AT KEEL:</span><span class="kv-val amber" id="env-water-depth">1420 m</span></div>
+              <div class="kv-row"><span class="kv-key">UNDER KEEL CLEARANCE:</span><span class="kv-val" id="env-clearance">1360 m</span></div>
+              <div class="kv-row"><span class="kv-key">THERMOCLINE LAYER:</span><span class="kv-val cyan" id="env-layer-depth">115 m</span></div>
+              <div class="kv-row"><span class="kv-key">SURFACE DUCT / SEA STATE:</span><span class="kv-val" id="env-sea-state">SS 3 (104 dB)</span></div>
+              <div class="kv-row"><span class="kv-key">SOUND VELOCITY (KEEL):</span><span class="kv-val" id="env-sound-vel">1524 m/s</span></div>
+              <div class="kv-row"><span class="kv-key">BAFFLE BLIND ARC:</span><span class="kv-val" id="env-baffles">150°..210° REL</span></div>
+              <div class="kv-row"><span class="kv-key">TB-29A TOWED ARRAY:</span><span class="kv-val" id="env-towed-status">STREAMED (800m)</span></div>
+
+              <div class="panel-header" style="margin-top:10px;">
+                <span>ACTIVE WEAPONS &amp; WIRES</span>
+              </div>
+              <div id="tac-active-weapons-list" style="font-size:11px; min-height:70px; color:var(--text-muted);">
+                NO WEAPONS IN WATER / AIR
+              </div>
+            </div>
+
+            <div style="border-top:1px solid var(--border-color); padding-top:6px;">
+              <div style="font-size:10px; color:var(--text-muted); margin-bottom:4px;">LEGEND &amp; SYMBOLOGY (NTDS):</div>
+              <div style="display:grid; grid-template-columns:1fr 1fr; font-size:10px; gap:2px;">
+                <span style="color:var(--crt-cyan);">[U] OWN SUB / NATO</span>
+                <span style="color:var(--crt-amber);">[O] UNKNOWN / TMA</span>
+                <span style="color:var(--crt-red);">[&lt;&gt;] NON-NATO SHIP</span>
+                <span style="color:var(--crt-red);">[V] NON-NATO SUB</span>
+                <span style="color:var(--crt-green);">[[]] AIS MERCHANT</span>
+                <span style="color:#a8ff60;">[~~] BIOLOGIC (WHALE)</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================================================
+             STATION 2: AN/BQQ-10 SONAR SUITE & TARGET MOTION ANALYSIS (TMA)
+             ================================================================ -->
+        <section id="screen-sonar" class="station-screen">
+          <!-- Top-Left: Broadband Bearing-Time Waterfall (BTR) -->
+          <div class="crt-panel" style="grid-column: 1 / 2; grid-row: 1 / 2;">
+            <div class="panel-header">
+              <span>AN/BQQ-10 PASSIVE BROADBAND WATERFALL (000° - 359° TRUE)</span>
+              <div style="display:flex; gap:6px; align-items:center;">
+                <span id="sonar-cursor-brg" style="color:var(--crt-cyan);">BRG: 000°</span>
+                <button class="mil-btn" id="btn-sonar-ping">ACTIVE PING (3.5 kHz)</button>
+                <button class="mil-btn active" id="btn-towed-array">TB-29A TOWED ARRAY: DEPLOYED</button>
+              </div>
+            </div>
+            <div style="flex:1; position:relative; min-height:0;">
+              <canvas id="sonar-waterfall-canvas" style="width:100%; height:100%; display:block; cursor:crosshair;"></canvas>
+            </div>
+          </div>
+
+          <!-- Bottom-Left: Narrowband LOFAR / DEMON Acoustic Spectrum & Classifier -->
+          <div class="crt-panel" style="grid-column: 1 / 2; grid-row: 2 / 3;">
+            <div class="panel-header">
+              <span>NARROWBAND LOFAR / DEMON BLADE-RATE SPECTRUM (10 Hz - 400 Hz)</span>
+              <span id="sonar-spectrum-target" style="color:var(--crt-amber);">MONITORING SELECTED CONTACT</span>
+            </div>
+            <div style="flex:1; display:grid; grid-template-columns: 1fr 270px; gap:6px; min-height:0;">
+              <canvas id="sonar-demon-canvas" style="width:100%; height:100%; display:block;"></canvas>
+              <div style="display:flex; flex-direction:column; justify-content:space-between; font-size:11px; border-left:1px solid var(--border-color); padding-left:6px;">
+                <div>
+                  <div style="color:var(--crt-amber); font-weight:bold; margin-bottom:3px;">ACOUSTIC SIGNATURE MATCHER</div>
+                  <div class="kv-row"><span class="kv-key">DETECTED TONALS:</span><span class="kv-val cyan" id="demon-tonals">-- Hz</span></div>
+                  <div class="kv-row"><span class="kv-key">PROPELLER BLADES:</span><span class="kv-val" id="demon-blades">--</span></div>
+                  <div class="kv-row"><span class="kv-key">REACTOR / PLANT:</span><span class="kv-val" id="demon-plant">--</span></div>
+                  <div style="margin-top:6px; color:var(--text-muted); font-size:10px;">CLASSIFY SELECTED CONTACT AS:</div>
+                  <select id="select-classify-profile" class="mil-select" style="width:100%; margin-top:3px;"></select>
+                </div>
+                <div style="display:flex; gap:4px;">
+                  <button class="mil-btn" id="btn-confirm-classify" style="flex:1;">CONFIRM ID</button>
+                  <button class="mil-btn amber" id="btn-auto-classify" title="Sonar Supervisor Assisted Classification">AUTO-ID</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right Column (Spans both rows): TMA Solution & Acoustic Reference Table -->
+          <div class="crt-panel" style="grid-column: 2 / 3; grid-row: 1 / 3; overflow-y:auto; justify-content:space-between;">
+            <div>
+              <div class="panel-header">
+                <span>TARGET MOTION ANALYSIS (TMA)</span>
+                <span id="tma-track-id">NO TRACK</span>
+              </div>
+              <canvas id="tma-mini-canvas" width="300" height="170" style="width:100%; height:170px; background:#030805; border:1px solid var(--border-color); margin-bottom:6px;"></canvas>
+
+              <div class="kv-row"><span class="kv-key">DESIGNATION:</span><span class="kv-val amber" id="tma-desig">--</span></div>
+              <div class="kv-row"><span class="kv-key">CLASSIFICATION:</span><span class="kv-val" id="tma-class">UNKNOWN</span></div>
+              <div class="kv-row"><span class="kv-key">TRUE BEARING / RATE:</span><span class="kv-val cyan" id="tma-brg">---° (0.0°/m)</span></div>
+              <div class="kv-row"><span class="kv-key">TMA SOLUTION QUALITY:</span><span class="kv-val" id="tma-quality">0% (POOR)</span></div>
+              <div class="gauge-bar-outer" style="margin:3px 0 6px 0;">
+                <div class="gauge-bar-inner" id="tma-quality-bar" style="width:0%;"></div>
+              </div>
+              <div class="kv-row"><span class="kv-key">EST. RANGE (TMA):</span><span class="kv-val amber" id="tma-range">--.- NM (---- yds)</span></div>
+              <div class="kv-row"><span class="kv-key">EST. COURSE / SPEED:</span><span class="kv-val" id="tma-crs-spd">---° / -- KT</span></div>
+              <div class="kv-row"><span class="kv-key">EST. TARGET DEPTH:</span><span class="kv-val" id="tma-depth">-- m</span></div>
+              <div class="kv-row"><span class="kv-key">SIGNAL EXCESS (SNR):</span><span class="kv-val" id="tma-snr">-- dB</span></div>
+
+              <div style="margin-top:8px; padding:5px; background:#06110a; border:1px solid var(--border-color); font-size:10px; color:var(--text-main);">
+                <strong style="color:var(--crt-amber);">TMA TIP:</strong> Passive sonar measures bearing only. To triangulate range &amp; speed rapidly, change course by 30°+ ("TMA Leg") to observe bearing rate shift, or use Towed Array / Active Ping.
+              </div>
+            </div>
+
+            <div style="margin-top:8px;">
+              <div class="panel-header"><span>ONI ACOUSTIC REFERENCE DB</span></div>
+              <div id="oni-db-mini" style="font-size:10px; max-height:165px; overflow-y:auto;"></div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================================================
+             STATION 3: FIRE CONTROL & WEAPONS LAUNCH (AN/BYG-1 TI-18)
+             ================================================================ -->
+        <section id="screen-weapons" class="station-screen">
+          <!-- Column 1: 4x 533mm Torpedo Tubes & 12x VLS Payload Tubes -->
+          <div class="crt-panel" style="overflow-y:auto;">
+            <div class="panel-header">
+              <span>533MM TORPEDO TUBES (1 - 4)</span>
+              <span id="weps-reload-stock" style="color:var(--crt-cyan)">MAGAZINE: 16 REM</span>
+            </div>
+            <div id="torpedo-tubes-container"></div>
+
+            <div class="panel-header" style="margin-top:8px;">
+              <span>VIRGINIA PAYLOAD MODULE (VLS 1-6)</span>
+              <span style="color:var(--crt-amber)">MAX DEPTH: 45m</span>
+            </div>
+            <div id="vls-tubes-container"></div>
+
+            <div class="panel-header" style="margin-top:8px;">
+              <span>COUNTERMEASURES &amp; EVASION</span>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px;">
+              <span style="font-size:11px;">ADC MK3 DECOYS: <strong id="cm-count" style="color:var(--crt-amber)">8</strong></span>
+              <button class="mil-btn amber" id="btn-launch-decoy">LAUNCH NOISEMAKER [C]</button>
+              <button class="mil-btn danger" id="btn-evasive-knuckle">EVASIVE KNUCKLE</button>
+            </div>
+          </div>
+
+          <!-- Column 2: Weapon Preset & Wire-Guidance Attack Console -->
+          <div class="crt-panel" style="justify-content:space-between;">
+            <div>
+              <div class="panel-header">
+                <span>WEAPON PRESETS &amp; FIRE CONTROL SOLUTION</span>
+                <span id="fc-selected-target">TARGET: NONE</span>
+              </div>
+              <div class="grid-2" style="margin-bottom:8px;">
+                <div class="kv-row"><span class="kv-key">TARGET TRACK:</span><span class="kv-val amber" id="fc-tgt-name">MANUAL BEARING</span></div>
+                <div class="kv-row"><span class="kv-key">TMA QUALITY:</span><span class="kv-val" id="fc-tgt-qual">--%</span></div>
+                <div class="kv-row"><span class="kv-key">LINE OF SIGHT BRG:</span><span class="kv-val cyan" id="fc-tgt-brg">000°</span></div>
+                <div class="kv-row"><span class="kv-key">LEAD INTERCEPT HDG:</span><span class="kv-val amber" id="fc-lead-hdg">000°</span></div>
+                <div class="kv-row"><span class="kv-key">EST TARGET RANGE:</span><span class="kv-val" id="fc-tgt-rng">--.- NM</span></div>
+                <div class="kv-row"><span class="kv-key">TORPEDO RUN TIME:</span><span class="kv-val" id="fc-run-time">--:--</span></div>
+              </div>
+
+              <div class="panel-header"><span>MK-48 ADCAP / MISSILE PRESET PARAMETERS</span></div>
+              <div style="display:flex; flex-direction:column; gap:6px; padding:4px 0;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <label>LAUNCH GYRO HEADING (000°-359°):</label>
+                  <div style="display:flex; gap:4px; align-items:center;">
+                    <input type="number" id="input-weps-hdg" class="mil-input" min="0" max="359" value="90" style="width:65px;" />
+                    <button class="mil-btn" id="btn-weps-sync-lead">USE TMA LEAD</button>
+                  </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <label>TORPEDO RUN DEPTH (METERS):</label>
+                  <div style="display:flex; gap:4px;">
+                    <input type="number" id="input-weps-depth" class="mil-input" min="5" max="600" value="40" style="width:65px;" />
+                    <button class="mil-btn" id="btn-weps-depth-surf">SURF (8m)</button>
+                    <button class="mil-btn" id="btn-weps-depth-deep">BELOW LAYER (160m)</button>
+                  </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <label>SEEKER ENABLE RUN DISTANCE (YDS):</label>
+                  <input type="number" id="input-weps-enable" class="mil-input" min="300" max="25000" step="200" value="1500" style="width:85px;" />
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <label>MK-48 SPEED &amp; HOMING MODE:</label>
+                  <div style="display:flex; gap:4px;">
+                    <select id="select-weps-speed" class="mil-select">
+                      <option value="28">28 KT (QUIET / LONG RANGE)</option>
+                      <option value="40" selected>40 KT (STANDARD TACTICAL)</option>
+                      <option value="55">55 KT (TERMINAL ATTACK)</option>
+                    </select>
+                    <select id="select-weps-homing" class="mil-select">
+                      <option value="ACTIVE_PASSIVE" selected>ACT/PASS COMBO</option>
+                      <option value="PASSIVE">PASSIVE ONLY (COVERT)</option>
+                      <option value="ACTIVE">ACTIVE PINGER</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                  <label>SEARCH PATTERN AT ENABLE POINT:</label>
+                  <select id="select-weps-pattern" class="mil-select">
+                    <option value="SNAKE" selected>SNAKE S-TURN (±30° SECTOR)</option>
+                    <option value="STRAIGHT">STRAIGHT RUN</option>
+                    <option value="CIRCLE">LOITER / CIRCLE</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+
+            <!-- Live Wire Guidance Box -->
+            <div style="border-top:1px solid var(--border-color); padding-top:6px;">
+              <div class="panel-header">
+                <span>LIVE FIBER-OPTIC WIRE GUIDANCE CONTROL</span>
+                <span id="wire-active-count" style="color:var(--crt-cyan)">0 ACTIVE</span>
+              </div>
+              <div id="wire-control-panel" style="min-height:135px; max-height:175px; overflow-y:auto;">
+                <div style="color:var(--text-muted); text-align:center; padding-top:35px;">
+                  NO WIRE-GUIDED TORPEDOES CURRENTLY IN WATER
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 3: Fire Control Attack Radar/Bearing Scope -->
+          <div class="crt-panel">
+            <div class="panel-header">
+              <span>WEAPONS ENGAGEMENT ENVELOPE</span>
+              <span>ZOOM: <button class="mil-btn" id="btn-fc-zoom">10 NM</button></span>
+            </div>
+            <canvas id="fc-polar-canvas" style="width:100%; flex:1; background:#030805; border:1px solid var(--border-color);"></canvas>
+            <div style="font-size:10px; color:var(--text-muted); margin-top:4px;">
+              NOTE: MK-48 guidance wire breaks if own ship exceeds 22 knots or turns &gt;110° from launch tube bearing. Harpoon/Tomahawk launch requires depth &le; 45m &amp; speed &le; 12 kts.
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================================================
+             STATION 4: MANEUVERING, TRIM, BALLAST & BATHYTHERMOGRAPH
+             ================================================================ -->
+        <section id="screen-maneuvering" class="station-screen">
+          <!-- Column 1: Ship Attitude, Planes, Rudder & Depth Profile -->
+          <div class="crt-panel">
+            <div class="panel-header">
+              <span>SHIP CONTROL &amp; HYDROPLANES (FLY-BY-WIRE)</span>
+              <span id="man-autopilot-badge" style="color:var(--crt-green)">AUTO-DEPTH: ON</span>
+            </div>
+            <canvas id="maneuvering-profile-canvas" width="380" height="220" style="width:100%; height:210px; background:#030805; border:1px solid var(--border-color); margin-bottom:8px;"></canvas>
+
+            <div style="display:flex; flex-direction:column; gap:8px;">
+              <div>
+                <div style="display:flex; justify-content:space-between;">
+                  <span>BOW PLANES ANGLE (-25° DIVE .. +25° RISE):</span>
+                  <strong id="val-bow-planes" style="color:var(--crt-cyan)">0.0°</strong>
+                </div>
+                <input type="range" id="slider-bow-planes" min="-25" max="25" step="1" value="0" />
+              </div>
+
+              <div>
+                <div style="display:flex; justify-content:space-between;">
+                  <span>STERN PLANES ANGLE (-25° DIVE .. +25° RISE):</span>
+                  <strong id="val-stern-planes" style="color:var(--crt-cyan)">0.0°</strong>
+                </div>
+                <input type="range" id="slider-stern-planes" min="-25" max="25" step="1" value="0" />
+              </div>
+
+              <div>
+                <div style="display:flex; justify-content:space-between;">
+                  <span>RUDDER ANGLE (-30° LEFT .. +30° RIGHT):</span>
+                  <strong id="val-rudder" style="color:var(--crt-amber)">0.0°</strong>
+                </div>
+                <input type="range" id="slider-rudder" min="-30" max="30" step="1" value="0" />
+              </div>
+
+              <div style="display:flex; gap:4px; margin-top:4px;">
+                <button class="mil-btn active" id="btn-auto-depth">AUTO DEPTH HOLD</button>
+                <button class="mil-btn" id="btn-manual-planes">MANUAL PLANES</button>
+                <button class="mil-btn" id="btn-zero-helm">AMIDSHIPS [SPACE]</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Column 2: Main Ballast Tanks (MBT), High Pressure Air & Variable Trim -->
+          <div class="crt-panel" style="justify-content:space-between;">
+            <div>
+              <div class="panel-header">
+                <span>BALLAST CONTROL PANEL (MBT &amp; TRIM)</span>
+                <span id="ballast-net-tons" style="color:var(--crt-cyan)">NET: +0.0 TONS</span>
+              </div>
+
+              <!-- MBT Forward & Aft -->
+              <div style="background:#06100a; border:1px solid var(--border-color); padding:6px; margin-bottom:8px;">
+                <div style="font-weight:bold; color:var(--crt-amber); margin-bottom:4px;">MAIN BALLAST TANKS (MBT 1A/1B/2A/2B)</div>
+                <div class="kv-row"><span class="kv-key">MBT WATER FILL LEVEL:</span><span class="kv-val cyan" id="mbt-fill-pct">100.0% (SUBMERGED)</span></div>
+                <div class="gauge-bar-outer" style="margin:4px 0;">
+                  <div class="gauge-bar-inner cyan" id="mbt-fill-bar" style="width:100%;"></div>
+                </div>
+                <div class="kv-row"><span class="kv-key">MBT VENT VALVES:</span><span class="kv-val" id="mbt-vent-state">CLOSED</span></div>
+                <div class="kv-row"><span class="kv-key">HIGH PRESSURE AIR BANKS:</span><span class="kv-val amber" id="hp-air-psi">4500 PSI (100%)</span></div>
+                <div class="gauge-bar-outer" style="margin:4px 0;">
+                  <div class="gauge-bar-inner amber" id="hp-air-bar" style="width:100%;"></div>
+                </div>
+
+                <div class="grid-3" style="margin-top:6px;">
+                  <button class="mil-btn" id="btn-mbt-vent">OPEN MBT VENTS (FLOOD)</button>
+                  <button class="mil-btn amber" id="btn-mbt-blow">NORMAL LP/HP BLOW</button>
+                  <button class="mil-btn danger" id="btn-emergency-blow">EMERGENCY EMBT BLOW!</button>
+                </div>
+              </div>
+
+              <!-- Variable Ballast / Trim Manifold -->
+              <div style="background:#06100a; border:1px solid var(--border-color); padding:6px;">
+                <div style="font-weight:bold; color:var(--crt-green); margin-bottom:4px;">VARIABLE BALLAST &amp; TRIM TANKS</div>
+                <div class="kv-row"><span class="kv-key">AUXILIARY DEPTH CONTROL TANK:</span><span class="kv-val" id="trim-aux-tons">0.0 TONS (NEUTRAL)</span></div>
+                <div class="kv-row"><span class="kv-key">LONGITUDINAL TRIM BALANCE:</span><span class="kv-val" id="trim-pitch-moment">0.0° MOMENT</span></div>
+                <div class="kv-row"><span class="kv-key">SEAWATER DENSITY COMPENSATION:</span><span class="kv-val" id="trim-density">1026.2 kg/m³</span></div>
+
+                <div class="grid-3" style="margin-top:6px;">
+                  <button class="mil-btn" id="btn-trim-flood">FLOOD AUX (+2T HEAVY)</button>
+                  <button class="mil-btn active" id="btn-trim-neutral">AUTO-NEUTRAL TRIM</button>
+                  <button class="mil-btn" id="btn-trim-pump">PUMP AUX (-2T LIGHT)</button>
+                </div>
+                <div class="grid-2" style="margin-top:4px;">
+                  <button class="mil-btn" id="btn-hp-compressor">HP AIR COMPRESSOR (SURF/SNORKEL)</button>
+                  <button class="mil-btn" id="btn-hover-system">HOVERING SYSTEM (MISSILE LAUNCH)</button>
+                </div>
+              </div>
+            </div>
+
+            <div style="font-size:10px; color:var(--text-muted); border-top:1px solid var(--border-color); padding-top:4px;">
+              PHYSICS NOTE: Seawater compresses the pressure hull faster than water compressibility increases at depth. Keep Auto-Neutral Trim active or manually pump/flood Aux tanks when hovering at <strong style="color:var(--crt-amber)">&lt;3 knots</strong> where hydroplanes have minimal lift!
+            </div>
+          </div>
+
+          <!-- Column 3: Bathythermograph & Sound Velocity Profile (SVP) -->
+          <div class="crt-panel">
+            <div class="panel-header">
+              <span>BATHYTHERMOGRAPH &amp; ACOUSTIC LAYER</span>
+              <span>XBT PROBE</span>
+            </div>
+            <canvas id="bathy-svp-canvas" width="300" height="320" style="width:100%; flex:1; background:#030805; border:1px solid var(--border-color);"></canvas>
+            <div style="font-size:10px; margin-top:6px; color:var(--text-main);">
+              <div><strong style="color:var(--crt-cyan)">THERMOCLINE EFFECT:</strong> Sound waves bend toward cooler/slower water below the layer (~115m).</div>
+              <div style="margin-top:3px;">Submarines across the thermal layer suffer <strong style="color:var(--crt-amber)">-14 dB acoustic shadow attenuation</strong> against surface warship hull sonars!</div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================================================
+             STATION 5: S9G PRESSURIZED WATER NUCLEAR REACTOR & STEAM PLANT
+             ================================================================ -->
+        <section id="screen-reactor" class="station-screen">
+          <!-- Left: Interactive S9G PWR Schematic Diagram -->
+          <div class="crt-panel">
+            <div class="panel-header">
+              <span>GENERAL ELECTRIC S9G PRESSURIZED WATER REACTOR (PWR) SCHEMATIC</span>
+              <span id="rx-loop-banner" style="color:var(--crt-green)">PRIMARY LOOP: NORMAL</span>
+            </div>
+            <canvas id="reactor-schematic-canvas" style="width:100%; flex:1; background:#030805; border:1px solid var(--border-color);"></canvas>
+          </div>
+
+          <!-- Right: Reactor Controls, Rod Drive, Coolant Pumps & Electrical Bus -->
+          <div class="crt-panel" style="justify-content:space-between; overflow-y:auto;">
+            <div>
+              <div class="panel-header">
+                <span>REACTOR PLANT CONTROL PANEL (RPCP)</span>
+              </div>
+
+              <!-- Control Rods -->
+              <div style="background:#06100a; border:1px solid var(--border-color); padding:6px; margin-bottom:6px;">
+                <div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                  <span>CONTROL ROD WITHDRAWAL:</span>
+                  <strong id="rx-rod-pct" style="color:var(--crt-amber)">38.0%</strong>
+                </div>
+                <input type="range" id="slider-control-rods" min="0" max="100" step="0.5" value="38" />
+                <div style="display:flex; gap:4px; margin-top:6px;">
+                  <button class="mil-btn active" id="btn-rx-auto">AUTO T-AVG REGULATOR</button>
+                  <button class="mil-btn" id="btn-rx-manual">MANUAL RODS</button>
+                </div>
+              </div>
+
+              <!-- Primary Coolant Pumps -->
+              <div style="background:#06100a; border:1px solid var(--border-color); padding:6px; margin-bottom:6px;">
+                <div style="font-weight:bold; color:var(--crt-cyan); margin-bottom:4px;">MAIN COOLANT PUMPS (LOOP A &amp; B)</div>
+                <div style="font-size:10px; color:var(--text-muted); margin-bottom:4px;">
+                  Natural Circulation supports up to 35% reactor power silently (+0 dB). Slow Pumps support 75% (+5 dB). Fast Pumps support 100% Flank (+14 dB).
+                </div>
+                <div class="grid-3">
+                  <button class="mil-btn" id="btn-pump-nat">NAT CIRC (SILENT)</button>
+                  <button class="mil-btn active" id="btn-pump-slow">SLOW PUMPS</button>
+                  <button class="mil-btn" id="btn-pump-fast">FAST PUMPS</button>
+                </div>
+              </div>
+
+              <!-- Telemetry Readouts -->
+              <div class="kv-row"><span class="kv-key">NEUTRON FLUX / THERMAL:</span><span class="kv-val amber" id="rx-val-flux">28.4% (59.6 MWt)</span></div>
+              <div class="kv-row"><span class="kv-key">CORE T-AVG (TARGET 285°C):</span><span class="kv-val" id="rx-val-tavg">285.2 °C</span></div>
+              <div class="kv-row"><span class="kv-key">T-HOT / T-COLD LEG:</span><span class="kv-val" id="rx-val-thot">298°C / 272°C</span></div>
+              <div class="kv-row"><span class="kv-key">PRIMARY LOOP PRESSURE:</span><span class="kv-val cyan" id="rx-val-press">2250 PSI</span></div>
+              <div class="kv-row"><span class="kv-key">STEAM GENERATOR PRESS:</span><span class="kv-val" id="rx-val-steam">890 PSI</span></div>
+              <div class="kv-row"><span class="kv-key">MAIN TURBINE SHAFT RPM:</span><span class="kv-val amber" id="rx-val-rpm">72 RPM</span></div>
+              <div class="kv-row"><span class="kv-key">TURBINE GENERATOR LOAD:</span><span class="kv-val" id="rx-val-elec">4.2 MWe (ONLINE)</span></div>
+              <div class="kv-row"><span class="kv-key">EMERGENCY DIESEL GEN:</span><span class="kv-val" id="rx-val-diesel">STANDBY (REQ PD/SURF)</span></div>
+
+              <div class="grid-2" style="margin-top:8px;">
+                <button class="mil-btn" id="btn-diesel-toggle">START EMERGENCY DIESEL</button>
+                <button class="mil-btn" id="btn-rx-restart">RESET TRIP &amp; PULL RODS</button>
+              </div>
+            </div>
+
+            <div style="border-top:1px solid var(--border-color); padding-top:6px;">
+              <button class="mil-btn danger" id="btn-rx-scram" style="width:100%; padding:8px; font-size:13px;">
+                MANUAL REACTOR SCRAM (EMERGENCY DROP RODS)
+              </button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ================================================================
+             STATION 6: PHOTONICS PERISCOPE, BPS-16 RADAR & AN/BLQ-10 ESM
+             ================================================================ -->
+        <section id="screen-periscope" class="station-screen">
+          <!-- Left: Optical / Thermal FLIR Photonics Mast View -->
+          <div class="crt-panel">
+            <div class="panel-header">
+              <span>AN/BVS-1 PHOTONICS MAST (PERISCOPE DEPTH &le; 20m REQUIRED)</span>
+              <div style="display:flex; gap:4px;">
+                <button class="mil-btn" id="btn-scope-raise">RAISE SCOPE</button>
+                <button class="mil-btn" id="btn-scope-ir">FLIR THERMAL</button>
+                <button class="mil-btn" id="btn-scope-zoom">MAG: 1.5X</button>
+              </div>
+            </div>
+            <div style="flex:1; position:relative; min-height:0;">
+              <canvas id="periscope-canvas" style="width:100%; height:100%; display:block; background:#020604;"></canvas>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:4px;">
+              <span>SLEW BEARING: <strong id="scope-brg-val" style="color:var(--crt-amber)">000° TRUE</strong></span>
+              <div style="display:flex; gap:4px;">
+                <button class="mil-btn" id="btn-scope-left">&lt;&lt; SLEW L</button>
+                <button class="mil-btn" id="btn-scope-lock-tgt">LOCK SELECTED TARGET</button>
+                <button class="mil-btn" id="btn-scope-right">SLEW R &gt;&gt;</button>
+              </div>
+            </div>
+          </div>
+
+          <!-- Right: AN/BPS-16 Surface Radar & AN/BLQ-10 ESM Warning Receiver -->
+          <div class="crt-panel" style="justify-content:space-between;">
+            <div>
+              <div class="panel-header">
+                <span>AN/BPS-16 RADAR &amp; AN/BLQ-10 ESM MAST</span>
+              </div>
+              <div style="display:flex; gap:4px; margin-bottom:6px;">
+                <button class="mil-btn" id="btn-mast-esm" style="flex:1;">ESM MAST: DOWN</button>
+                <button class="mil-btn danger" id="btn-mast-radar" style="flex:1;">RADAR TX: STBY</button>
+              </div>
+              <canvas id="radar-esm-canvas" width="320" height="270" style="width:100%; height:260px; background:#030805; border:1px solid var(--border-color);"></canvas>
+            </div>
+
+            <div style="flex:1; overflow-y:auto; margin-top:6px;">
+              <div class="panel-header"><span>ESM INTERCEPT LOG (RADAR WARNING)</span></div>
+              <div id="esm-intercept-list" style="font-size:10px;">
+                <div style="color:var(--text-muted)">RAISE ESM MAST AT &le; 20m TO INTERCEPT HOSTILE RADAR EMISSIONS</div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+
+      <!-- ==================================================================
+           RIGHT ALWAYS-ON CONN / HELM / CONTACTS SIDEBAR
+           ================================================================== -->
+      <aside id="conn-sidebar">
+        <!-- Quick Helm & Telegraph Control -->
+        <div class="crt-panel">
+          <div class="panel-header">
+            <span>CONN / HELM ORDERS</span>
+            <span id="sidebar-cav-warn" style="color:var(--crt-green); font-size:10px;">PROP QUIET</span>
+          </div>
+
+          <!-- Heading Controls -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span>ORDERED COURSE:</span>
+            <div style="display:flex; gap:3px; align-items:center;">
+              <button class="mil-btn" id="btn-hdg-l15">-15°</button>
+              <input type="number" id="input-order-hdg" class="mil-input" min="0" max="359" value="90" style="width:52px; text-align:center;" />
+              <button class="mil-btn" id="btn-hdg-r15">+15°</button>
+            </div>
+          </div>
+
+          <!-- Depth Controls -->
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+            <span>ORDERED DEPTH (m):</span>
+            <div style="display:flex; gap:3px; align-items:center;">
+              <input type="number" id="input-order-depth" class="mil-input" min="0" max="650" step="5" value="60" style="width:58px; text-align:center;" />
+              <button class="mil-btn" id="btn-depth-pd" title="Periscope Depth 18m">PD 18m</button>
+              <button class="mil-btn" id="btn-depth-layer" title="Toggle Above/Below Thermal Layer">LAYER</button>
+              <button class="mil-btn" id="btn-depth-deep" title="Deep Evasion 300m">300m</button>
+            </div>
+          </div>
+
+          <!-- Engine Order Telegraph -->
+          <div style="font-size:10px; color:var(--text-muted); margin:3px 0 2px 0;">ENGINE TELEGRAPH (SPEED):</div>
+          <div style="display:grid; grid-template-columns:repeat(6, 1fr); gap:2px;">
+            <button class="mil-btn telegraph-btn" data-spd="-8">BK</button>
+            <button class="mil-btn telegraph-btn" data-spd="0">STOP</button>
+            <button class="mil-btn telegraph-btn" data-spd="5">1/3</button>
+            <button class="mil-btn telegraph-btn active" data-spd="8">2/3</button>
+            <button class="mil-btn telegraph-btn" data-spd="15">STD</button>
+            <button class="mil-btn telegraph-btn" data-spd="22">FULL</button>
+          </div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:2px; margin-top:2px;">
+            <button class="mil-btn telegraph-btn" data-spd="4">CREEP (4 KT SILENT)</button>
+            <button class="mil-btn danger telegraph-btn" data-spd="32">FLANK (32 KT CAV!)</button>
+          </div>
+        </div>
+
+        <!-- Tracked Contacts Table -->
+        <div class="crt-panel" style="flex:1; min-height:0; overflow:hidden;">
+          <div class="panel-header">
+            <span>TACTICAL CONTACT LIST</span>
+            <span id="contact-count-badge">0 TRACKS</span>
+          </div>
+          <div style="flex:1; overflow-y:auto;">
+            <table class="contact-table">
+              <thead>
+                <tr>
+                  <th>ID</th>
+                  <th>CLASS</th>
+                  <th>BRG</th>
+                  <th>RNG</th>
+                  <th>TMA</th>
+                </tr>
+              </thead>
+              <tbody id="contacts-table-body"></tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Quick Selected Target Action Box -->
+        <div class="crt-panel">
+          <div class="panel-header">
+            <span>SELECTED TRACK ACTIONS</span>
+            <span id="quick-tgt-id" style="color:var(--crt-cyan)">NONE</span>
+          </div>
+          <div id="quick-tgt-details" style="font-size:10px; margin-bottom:5px; color:var(--text-main);">
+            Select a contact on the map, waterfall, or table.
+          </div>
+          <div class="grid-2">
+            <button class="mil-btn amber" id="btn-quick-fire-torp">QUICK FIRE MK-48</button>
+            <button class="mil-btn" id="btn-quick-fire-missile">LAUNCH MISSILE</button>
+          </div>
+        </div>
+      </aside>
+    </main>
+
+    <!-- BOTTOM MESSAGE TICKER & SHORTCUT GUIDE -->
+    <footer id="bottom-log-bar">
+      <div id="combat-log"></div>
+      <div class="crt-panel" style="justify-content:space-between; font-size:10px;">
+        <div style="color:var(--crt-amber); font-weight:bold;">HOTKEYS &amp; COMMANDS</div>
+        <div><strong style="color:var(--crt-cyan)">[F1-F6]</strong> Switch Station | <strong style="color:var(--crt-cyan)">[A/D]</strong> Turn ±5°</div>
+        <div><strong style="color:var(--crt-cyan)">[W/S]</strong> Depth ±10m | <strong style="color:var(--crt-cyan)">[1-6]</strong> Speed Telegraph</div>
+        <div><strong style="color:var(--crt-cyan)">[P]</strong> Active Sonar Ping | <strong style="color:var(--crt-cyan)">[C]</strong> Launch Decoy</div>
+      </div>
+    </footer>
+  </div>
+
+  <!-- ON-SCREEN DISMISSIBLE TACTICAL MESSAGE POPUPS (WITH [X] CLOSE BUTTON) -->
+  <div id="tactical-alert-stack"></div>
+
+  <!-- NATO BASE, PROCEDURAL MISSION GENERATOR & SAVE/LOAD MODAL -->
+  <div id="briefing-modal" class="modal-backdrop" style="display:flex;">
+    <div class="modal-window">
+      <div class="panel-header" style="font-size:13px; padding:6px;">
+        <span>COMSUBNATO MEDITERRANEAN COMMAND // BASE SELECTION, ORDERS &amp; SAVE SYSTEM</span>
+        <button class="mil-btn" id="btn-close-briefing">CLOSE &amp; RESUME CURRENT PATROL [ESC]</button>
+      </div>
+      <div class="modal-body">
+        <!-- Save / Resume Section -->
+        <div style="background:#06130b; border:1px solid var(--crt-cyan); padding:8px; margin-bottom:10px; display:flex; justify-content:space-between; align-items:center; gap:8px;">
+          <div>
+            <div style="color:var(--crt-cyan); font-weight:bold;">PERSISTENT PATROL LOG &amp; SAVE STATE (AUTO-SAVES EVERY 15s)</div>
+            <div id="save-status-text" style="font-size:11px; color:var(--text-main);">Checking saved Mediterranean patrol...</div>
+          </div>
+          <div style="display:flex; gap:4px; flex-wrap:wrap;">
+            <button class="mil-btn amber" id="btn-load-saved-patrol">RESUME SAVED PATROL</button>
+            <button class="mil-btn" id="btn-save-now">SAVE NOW</button>
+            <button class="mil-btn" id="btn-export-save">EXPORT JSON</button>
+          </div>
+        </div>
+
+        <!-- NATO Base & Random Mission Generator -->
+        <div class="panel-header"><span>START NEW PATROL FROM NATO MEDITERRANEAN NAVAL BASE</span></div>
+        <div style="display:flex; flex-direction:column; gap:6px; margin-bottom:10px; background:#050c08; border:1px solid var(--border-color); padding:8px;">
+          <div style="display:flex; gap:8px; align-items:center;">
+            <span style="width:170px;">1. DEPARTURE NATO BASE:</span>
+            <select id="select-nato-base" class="mil-select" style="flex:1; font-size:12px; padding:4px;"></select>
+          </div>
+          <div id="base-description-text" style="font-size:11px; color:var(--crt-cyan); padding-left:178px;"></div>
+
+          <div style="display:flex; gap:8px; align-items:center; margin-top:4px;">
+            <span style="width:170px;">2. MISSION PROFILE:</span>
+            <select id="select-mission-type" class="mil-select" style="flex:1; font-size:12px; padding:4px;">
+              <option value="RANDOM" selected>RANDOM PROCEDURAL MISSION (PATROL / ATTACK / ESCORT)</option>
+              <option value="ASW_HUNT">ASW HUNTER-KILLER INTERCEPT (HUNT NON-NATO SUBMARINES)</option>
+              <option value="SAG_STRIKE">ANTI-SURFACE ACTION GROUP STRIKE (SLAVA CG &amp; FRIGATES)</option>
+              <option value="NATO_ESCORT">NATO CARRIER ESCORT &amp; ASW SCREEN (PROTECT ITS CAVOUR)</option>
+              <option value="PATROL_RECON">MEDITERRANEAN BARRIER PATROL (CHOKEPOINT DEFENSE)</option>
+            </select>
+            <button class="mil-btn amber" id="btn-start-mission" style="padding:6px 12px;">GENERATE &amp; DEPLOY MISSION</button>
+          </div>
+        </div>
+
+        <div class="panel-header"><span>ACTIVE PATROL ORDERS &amp; SITUATION BRIEFING</span></div>
+        <div id="briefing-content" style="background:#050c08; border:1px solid var(--border-color); padding:10px; margin-bottom:10px;"></div>
+
+        <div class="panel-header"><span>MEDITERRANEAN TACTICAL &amp; ACOUSTIC MANUAL</span></div>
+        <div class="grid-2" style="font-size:11px; margin-top:4px; gap:10px;">
+          <div>
+            <p><strong style="color:var(--crt-amber)">1. REAL SHIPPING TRAFFIC &amp; BIOLOGICS:</strong></p>
+            <p>The Mediterranean has dense commercial AIS traffic (container ships, ferries, LNG tankers, trawlers) and marine mammal pods (<strong>Sperm Whales, Fin Whales, Striped Dolphins</strong>). Use <strong>[F2] Narrowband DEMON</strong> to verify propeller blade counts (0 blades = Biologic whale/dolphin; 3–4 blades = Civilian AIS; 5–7 blades = Military Warship/Submarine) before firing!</p>
+          </div>
+          <div>
+            <p><strong style="color:var(--crt-cyan)">2. MEDITERRANEAN THERMOCLINE &amp; S9G PWR:</strong></p>
+            <p>Warm Mediterranean surface water sits over cooler Levantine Intermediate Water across a sharp <strong>Thermocline (~88m)</strong>. Hiding below the layer provides a <strong>-14 dB acoustic shadow</strong> against surface warships. Use <strong>Natural Circulation</strong> coolant pumps for silent stalking.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+
+  <!-- Simulation Modules -->
+  <script src="js/audio.js"></script>
+  <script src="js/bathymetry.js"></script>
+  <script src="js/reactor.js"></script>
+  <script src="js/physics.js"></script>
+  <script src="js/missions.js"></script>
+  <script src="js/entities.js"></script>
+  <script src="js/stations.js"></script>
+  <script src="js/main.js"></script>
+</body>
+</html>
