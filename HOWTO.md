@@ -1,199 +1,243 @@
-# Captain's Tactical & Engineering Manual (HOWTO)
+# Captain's Tactical & Engineering Guide
 
-Welcome aboard **USS *Virginia* (SSN-774)** operating under **COMSUBNATO Mediterranean Command**. This manual walks you step-by-step through operating your nuclear attack submarine, managing its **S9G Pressurized Water Reactor**, analyzing sonar signatures, and executing torpedo and missile attacks.
+Welcome aboard **USS *Virginia* (SSN-774)** in the simulator's fictional Mediterranean operating area.
 
-> Back to [**Main Project README**](./README.md)
+This guide explains the controls and the main gameplay loop. The simulator uses realistic naval terminology and a CRT-style interface, but its physics, sensors, reactor, and weapons are simplified game systems. It is **not** a real-world operating manual or a validated tactical trainer.
 
----
+> Back to the [project README](./README.md).
 
-## Table of Contents
+## Contents
 
-1. [Quick Start: Your First 60 Seconds on Patrol](#1-quick-start-your-first-60-seconds-on-patrol)
-2. [Selecting a NATO Mediterranean Base & Mission](#2-selecting-a-nato-mediterranean-base--mission)
-3. [Station-by-Station Guide (`F1` – `F6`)](#3-station-by-station-guide-f1--f6)
-4. [Sonar, Narrowband DEMON & Target Motion Analysis (TMA)](#4-sonar-narrowband-demon--target-motion-analysis-tma)
-5. [Distinguishing Threats from Whales & AIS Traffic](#5-distinguishing-threats-from-whales--ais-traffic)
-6. [Ocean Acoustics: Cavitation, Thermocline & Baffles](#6-ocean-acoustics-cavitation-thermocline--baffles)
-7. [Operating the S9G Pressurized Water Nuclear Reactor](#7-operating-the-s9g-pressurized-water-nuclear-reactor)
-8. [Buoyancy, Ballast Tanks & Hydroplanes](#8-buoyancy-ballast-tanks--hydroplanes)
-9. [Firing MK-48 ADCAP Torpedoes & VLS Missiles](#9-firing-mk-48-adcap-torpedoes--vls-missiles)
-10. [Torpedo Defense & Evasion Tactics](#10-torpedo-defense--evasion-tactics)
-11. [Saving, Loading & Exporting Patrols](#11-saving-loading--exporting-patrols)
-12. [Keyboard Shortcuts Reference](#12-keyboard-shortcuts-reference)
-
----
-
-## 1. Quick Start: Your First 60 Seconds on Patrol
-
-1. **Deploy from a NATO Base**: On the startup modal, select a departure base (e.g., **Augusta Bay / NAS Sigonella** or **Souda Bay, Crete**), pick a mission profile (or leave on **Random Procedural Mission**), and click **`GENERATE & DEPLOY MISSION`**.
-2. **Maintain Stealth**:
-   - Check the top HUD bar for **`THERMAL LAYER: ~88m`** and **`OWN NOISE (CAV)`**.
-   - Order a depth **below the thermal layer** (e.g., `120m`–`160m`) and keep your speed at **`2/3 (8 KT)`** or **`CREEP (4 KT)`** so you do not cavitate.
-3. **Classify Contacts on Sonar (`[F2]`)**:
-   - Press **`F2`** to open the **AN/BQQ-10 Sonar & TMA** console.
-   - Click a bright vertical green trace on the **Broadband Waterfall** (or select a track in the right-hand **Tactical Contact List**).
-   - Look at the **Narrowband LOFAR / DEMON Spectrum** in the bottom-left panel to read the contact's **Propeller Blade Count** and **Machinery Tonals (Hz)**, then click **`AUTO-ID`** (or manually match it from the dropdown and click **`CONFIRM ID`**).
-4. **Build a TMA Firing Solution**:
-   - Passive sonar only measures **bearing**. Wait for **TMA Solution Quality** to reach **`75%+`**, or turn your submarine by **`30°–45°`** (*"TMA Leg"*) so the bearing geometry shifts and triangulates the target's range.
-5. **Engage Hostile Targets (`[F3]`)**:
-   - Once positively identified as **`HOSTILE`** (Red Diamond or Red Submarine V-symbol), press **`F3`** (or click **`QUICK FIRE MK-48`** in the right sidebar) to launch a wire-guided torpedo!
+1. [Start a patrol](#1-start-a-patrol)
+2. [Choose a base and mission](#2-choose-a-base-and-mission)
+3. [The six operator stations](#3-the-six-operator-stations)
+4. [Sonar, classification, and TMA](#4-sonar-classification-and-tma)
+5. [Contacts, AIS, and marine life](#5-contacts-ais-and-marine-life)
+6. [Acoustic environment](#6-acoustic-environment)
+7. [Reactor and propulsion](#7-reactor-and-propulsion)
+8. [Maneuvering, depth, and ballast](#8-maneuvering-depth-and-ballast)
+9. [Weapons and countermeasures](#9-weapons-and-countermeasures)
+10. [Periscope, radar, and ESM](#10-periscope-radar-and-esm)
+11. [Save, resume, and export](#11-save-resume-and-export)
+12. [Keyboard shortcuts](#12-keyboard-shortcuts)
+13. [Model limitations](#13-model-limitations)
 
 ---
 
-## 2. Selecting a NATO Mediterranean Base & Mission
+## 1. Start a patrol
 
-Click **`NATO BASE / MISSION`** in the top navigation bar at any time to choose from 7 real-world NATO naval bases:
+1. Start the application and wait for the command/mission modal.
+2. Select a departure base.
+3. Select a mission profile, or use the random/procedural option if offered.
+4. Click **GENERATE & DEPLOY MISSION**.
+5. Use the station tabs or **F1–F6** to move between consoles.
 
-| NATO Naval Base | Coordinates | Theater Characteristics |
-| :--- | :--- | :--- |
-| **Augusta Bay / NAS Sigonella (Italy)** | `37°10'N 015°21'E` | Drops rapidly into the `4,000m` Ionian Abyssal Plain; guards the shallow Strait of Sicily. |
-| **Taranto Naval Base — Mar Grande (Italy)** | `40°15'N 017°09'E` | Deep Taranto submarine canyon leading toward the Strait of Otranto. |
-| **Toulon Naval Base (France)** | `42°55'N 005°56'E` | Deep Algero-Provençal Basin; rich in Fin & Sperm Whale pods in the Pelagos Sanctuary. |
-| **Souda Bay NATO Base (Crete, Greece)** | `35°37'N 024°16'E` | Overlooks the `5,120m` Calypso Deep / Hellenic Trench and Aegean chokepoints. |
-| **La Spezia Naval Base & CMRE (Italy)** | `43°52'N 009°46'E` | Northern Tyrrhenian & Corsican channel approaches. |
-| **HMNB Gibraltar / Rota (UK / Spain)** | `36°01'N 005°07'W` | Narrow Alboran Sea & Camarinal Sill (`285m`) bottleneck. |
-| **Aksaz NATO Naval Base (Turkey)** | `36°34'N 028°21'E` | Deep Rhodes Abyssal Basin (`4,250m`) and Levantine Sea lanes. |
+The top HUD shows simulation time, time compression, own-ship position, heading, speed, depth, seafloor estimate, noise, and reactor status.
 
-### Procedural Mission Profiles
-- **`ASW HUNTER-KILLER INTERCEPT`**: Hunt Non-NATO nuclear and diesel-electric submarines (*Yasen-M SSGN*, *Akula II SSN*, *Improved Kilo SSK*).
-- **`ANTI-SURFACE ACTION GROUP STRIKE`**: Penetrate an ASW screen to sink a *Slava*-class Guided Missile Cruiser and *Admiral Gorshkov* / *Grigorovich* frigates.
-- **`NATO CARRIER ESCORT & SCREEN`**: Protect the allied flagship **ITS *Cavour* (CVH-550)** (`FRIENDLY` Link-16 contact) from ambushing Non-NATO submarines.
-- **`MEDITERRANEAN BARRIER PATROL`**: Hold a strategic chokepoint against transiting hostile forces.
+Use the **1X**, **2X**, **5X**, and **10X** buttons to change simulation time compression. Return to **1X** when you want the simulation to advance in real time.
 
----
+## 2. Choose a base and mission
 
-## 3. Station-by-Station Guide (`F1` – `F6`)
+Open **NATO BASE / MISSION** from the top navigation to select one of the available starting locations:
 
-- **`[F1] GEO / TACTICAL PLOT`**:
-  - Real-world interactive chart powered by **NOAA/ESRI World Ocean Basemap**, **CartoDB Dark Vector**, and **OpenSeaMap Nautical Seamarks**.
-  - Click **`SET COURSE (CLICK MAP)`** and click anywhere in the sea to plot an automated navigation waypoint.
-  - Click **`PROBE BATHYMETRY`** and click on the chart to drop an expendable bathythermograph (`XBT`) and query live seafloor & thermocline depth.
-- **`[F2] SONAR & TMA`**:
-  - Top-left: **Broadband Bearing-Time Waterfall (`000°–359°`)**.
-  - Bottom-left: **Narrowband LOFAR / DEMON Spectrum (`10 Hz – 400 Hz`)** & **Acoustic Signature Matcher**.
-  - Right: **Target Motion Analysis (`TMA`)** solution quality bar, range/course/speed estimates, and the **ONI Acoustic Reference Database**.
-- **`[F3] FIRE CONTROL (WEPS)`**:
-  - Manage **Torpedo Tubes 1–4** (`533mm` MK-48 Mod 7 ADCAP), **VLS Payload Tubes 1–6** (`UGM-84 Harpoon` & `UGM-109E Tomahawk`), **Live Fiber-Optic Wire Guidance**, and **ADC Mk 3 Noisemaker Decoys**.
-- **`[F4] MANEUVERING & TRIM`**:
-  - Control **Bow Planes**, **Stern Planes**, **Rudder**, **Main Ballast Tanks (`MBT`)**, **High-Pressure Air (`4500 PSI`)**, **Variable Trim Tanks**, and view the **Bathythermograph Sound Velocity Profile (`SVP`)**.
-- **`[F5] S9G NUCLEAR REACTOR`**:
-  - Monitor the **Reactor Pressure Vessel**, **Control Rod Withdrawal (`0–100%`)**, **Main Coolant Pumps (`NAT CIRC`, `SLOW`, `FAST`)**, **Steam Generator**, **Main Turbines**, **Main Storage Battery**, and **Emergency Diesel Generator**.
-- **`[F6] PERISCOPE / RADAR / ESM`**:
-  - Raise the **AN/BVS-1 Photonics Mast** (requires depth `<= 20m`) for visual/FLIR thermal target identification, raise the **AN/BLQ-10 ESM Mast** to passively intercept hostile ship radars and civilian AIS transponders, or transmit on the **AN/BPS-16 Surface Search Radar**.
+| Starting location | Area |
+| --- | --- |
+| Augusta Bay / NAS Sigonella | Sicily, Italy |
+| Taranto Naval Base | Puglia, Italy |
+| Toulon Naval Base | France |
+| Souda Bay | Crete, Greece |
+| La Spezia | Liguria, Italy |
+| HMNB Gibraltar / Rota | Gibraltar / Spain |
+| Aksaz | Marmaris, Turkey |
 
----
+Mission profiles include:
+- **ASW Hunter-Killer Intercept** — locate and track hostile submarine contacts.
+- **Anti-Surface Action Group Strike** — engage hostile surface combatants.
+- **NATO Carrier Escort & Screen** — protect a friendly carrier group.
+- **Mediterranean Barrier Patrol** — patrol a designated operating area or chokepoint.
 
-## 4. Sonar, Narrowband DEMON & Target Motion Analysis (TMA)
+Mission composition and contact positions are generated by the game. They are not live operational tasking.
 
-### How Passive TMA Works
-Passive sonar detects the **direction (bearing)** of sound, not its distance.
-1. When a contact is first detected (`SIERRA-1`), its **TMA Quality** starts near `0%`, so its estimated range on the map has high uncertainty.
-2. Keep the **TB-29A Towed Array** deployed (`STREAMED 800m`) for a wide acoustic aperture.
-3. **Execute a TMA Leg**: Change your submarine's heading by `30°` to `60°` and maintain a steady speed for 20–30 seconds. Observing how the target's bearing rate shifts allows the AN/BYG-1 combat computer to triangulate exact range, course, and speed (`TMA > 80%`).
-4. **Active Sonar Ping (`3.5 kHz`)**: Clicking **`ACTIVE PING`** (or pressing **`P`**) immediately jumps TMA quality to **`96%+`** on all contacts within `18 NM`, **but** radiates a `+55 dB` transient that alerts every hostile warship and submarine in the sector!
+## 3. The six operator stations
 
----
+### F1 — GEO / Tactical Plot
+- View own-ship position, contacts, waypoints, and tactical overlays.
+- Select **FOLLOW SUB** to keep the map centered on the submarine.
+- Select **SET COURSE (CLICK MAP)**, then click the map to set a waypoint.
+- Switch between **NOAA/ESRI OCEAN** and **CRT DARK VECTOR** map layers.
+- Select **PROBE BATHYMETRY** and click the map to request an online elevation probe and update the local environmental display. This is not a measured seafloor-depth survey.
 
-## 5. Distinguishing Threats from Whales & AIS Traffic
+### F2 — Sonar & TMA
+- Inspect the broadband bearing-time waterfall.
+- Select a contact from the tactical contact list or click its trace.
+- Review the profile-based narrowband tonal display and acoustic classification controls.
+- Toggle the TB-29A towed-array gameplay setting.
+- Use **ACTIVE PING (3.5 kHz)** when you want an active-sensor contact update.
 
-Strict **Rules of Engagement (ROE)** apply in the Mediterranean. Use the **Narrowband DEMON Spectrum (`[F2]`)** to check propeller blade counts and tonal frequencies before launching weapons:
+### F3 — Fire Control (WEPS)
+- Manage the four 533 mm torpedo tubes and six VLS payload positions.
+- Select a contact and review the displayed launch bearing and target information.
+- Configure torpedo depth, seeker-enable distance, speed, homing, and search pattern where available.
+- Deploy acoustic decoys or trigger the evasive-knuckle maneuver.
 
-| Category | Allegiance | Propeller Blades | Typical Tonals (Hz) | Examples |
-| :--- | :--- | :---: | :---: | :--- |
-| **Non-NATO Submarines** | `HOSTILE` (Red `V`) | **7 Blades** | `36–50 Hz`, `88–250 Hz` | *Yasen-M SSGN*, *Akula II SSN*, *Improved Kilo SSK* |
-| **Non-NATO Warships** | `HOSTILE` (Red `<>`) | **5 Blades** | `50–60 Hz`, `120–290 Hz` | *Slava CG*, *Admiral Gorshkov FFG*, *Grigorovich FFG* |
-| **NATO Allied Task Group** | `FRIENDLY` (Cyan `U`) | **5 Blades** | `60 Hz`, `110–310 Hz` | *ITS Cavour Carrier*, *Bergamini/Aquitaine FREMM* (Auto-ID via Link-16) |
-| **Commercial AIS Traffic** | `NEUTRAL` (Green `[]`) | **3 – 4 Blades** | `22–35 Hz`, `60–190 Hz` | *MSC Container Liner*, *Grimaldi Ro-Ro Ferry*, *LNG Tanker*, *Fishing Trawler* |
-| **Marine Biologics** | `BIOLOGIC` (Lime `~~`) | **0 Blades (`NONE`)** | `20 Hz`, `42 Hz` or `140–365 Hz` | *Sperm Whale Pod*, *Pelagos Fin Whale*, *Striped Dolphin Pod* |
+### F4 — Maneuvering & Trim
+- Set bow-plane, stern-plane, and rudder inputs.
+- Use **AUTO DEPTH HOLD** or **MANUAL PLANES**.
+- Flood, blow, or pump the main ballast and auxiliary trim tanks.
+- Use the emergency EMBT blow control for the game's rapid-surfacing behavior.
+- Review the simulated sound-velocity profile and thermocline.
 
-> **Tip**: Selecting a contact also routes its acoustic signature to your **Hydrophone Audio Monitor**—ships and submarines produce a rhythmic mechanical blade swish, whereas whales and dolphins produce biological calls and clicks!
+### F5 — S9G Nuclear Reactor
+- Monitor reactor output, rod position, average/hot/cold temperatures, primary pressure, steam pressure, turbine RPM, electrical output, and battery.
+- Switch between automatic T-AVG regulation and manual rod control.
+- Select **NAT CIRC**, **SLOW PUMPS**, or **FAST PUMPS**.
+- Start the emergency diesel when operating at a suitable shallow depth.
+- If the reactor trips, wait for the SCRAM latch cooldown and use **RESET TRIP & PULL RODS** when permitted.
 
----
+### F6 — Periscope / Radar / ESM
+- Raise the photonics/periscope mast at periscope depth.
+- Use the available FLIR and zoom controls.
+- Slew the scope bearing and lock a selected contact where supported.
+- Raise the ESM mast to display simulated emissions/AIS-related information.
+- Activate the surface-search radar when you want the game to provide radar detections.
 
-## 6. Ocean Acoustics: Cavitation, Thermocline & Baffles
+## 4. Sonar, classification, and TMA
 
-1. **Propeller Cavitation**:
-   - When propeller blade-tip pressure drops below vapor pressure, water vapor bubbles form and collapse violently (`+46 dB` noise spike).
-   - Because water pressure increases every 10 meters of depth, your **Maximum Quiet Speed** increases the deeper you dive:
-     - **Periscope Depth (`18m`)**: Cavitates above **`11.7 knots`**.
-     - **Moderate Depth (`100m`)**: Cavitates above **`17.3 knots`**.
-     - **Deep Operation (`250m`)**: Cavitates above **`27.5 knots`**.
-2. **Mediterranean Thermocline (`~88m`)**:
-   - Warm surface water (`~23.5°C`) sits above cooler Levantine Intermediate Water (`~13.6°C`). Sound waves bend across this boundary, creating a **`-14 dB` acoustic shadow zone**.
-   - Stay **below the layer** when stalking surface warships so their hull sonars are blinded, then pop above the layer or set your torpedo run depth to `8m` to attack them.
-3. **Astern Baffles (`150°–210°` Relative)**:
-   - Your bow sonar array cannot hear through your own submarine's hull and propulsor wake directly astern. Keep your **TB-29A Towed Array** deployed (and stay below `25 knots` so you don't shear the cable) to monitor your baffles.
+### Passive sonar
+Passive sonar gameplay is centered on bearing and acoustic signatures. The waterfall shows contact traces over time. Select a trace or a contact-list entry to inspect it.
 
----
+### LOFAR/DEMON-style display
+The narrowband panel shows tonal values and blade-count information associated with the selected contact's acoustic profile. Use the profile selector and **AUTO-ID** / **CONFIRM ID** controls to classify a contact.
 
-## 7. Operating the S9G Pressurized Water Nuclear Reactor
+**Important implementation detail:** the current display is profile-driven. It does not derive a live LOFAR/DEMON spectrum from sampled hydrophone audio or run an FFT over the audio stream.
 
-Open **`[F5] S9G NUCLEAR REACTOR`** to manage your propulsion plant:
+### TMA display
+The TMA panel presents bearing, bearing rate, a quality percentage, estimated range, and estimated course/speed. A course change and towed-array setting can affect the displayed tracking quality.
 
-- **Control Rods & Auto $T_{avg}$ Regulator**:
-  - With **`AUTO T-AVG REGULATOR`** enabled, control rods automatically withdraw or insert to keep primary loop temperature at **`285°C`** as turbine steam demand changes.
-- **Main Coolant Pumps (`LOOP A & B`)**:
-  - **`NAT CIRC (SILENT)`**: Uses thermal buoyancy convection with pumps off (`+0 dB` noise). Supports up to **`38%` reactor power** (~12 knots). *Warning: Ordering Flank speed while on Natural Circulation will overheat the core (`T-Hot > 332°C`) and trigger an automatic **Reactor SCRAM**!*
-  - **`SLOW PUMPS`**: Standard patrol setting (`+5 dB` noise, supports up to **`76%` power** / ~23 knots).
-  - **`FAST PUMPS`**: Combat flank setting (`+14 dB` noise, supports **`100%+` power** / 32 knots).
-- **Recovering from a Reactor SCRAM**:
-  - If the reactor trips (`RX SCRAM`), control rods drop to `0%` and propulsion switches to the **Main Storage Battery** (max `6 knots`).
-  - Wait `8 seconds` for the trip latch to cool down, lower your speed telegraph to `1/3` or `STOP`, and click **`RESET TRIP & PULL RODS`**.
+**Do not interpret the current TMA percentage as a real bearing-only fire-control solution.** The current code reads simulated target truth (including true bearing and range) and calculates estimates from that information with a quality-dependent bias. It does not solve target motion independently from a history of noisy bearings and own-ship maneuvers.
 
----
+### Active sonar
+Use **ACTIVE PING (3.5 kHz)** from the map or sonar station. In the current game logic, an active ping provides a rapid contact/range update and raises the displayed TMA quality for eligible contacts. It also triggers the active-sonar annunciation and contact-response gameplay.
 
-## 8. Buoyancy, Ballast Tanks & Hydroplanes
+## 5. Contacts, AIS, and marine life
 
-Open **`[F4] MANEUVERING & TRIM`**:
-- **Hydroplanes (Bow & Stern Planes)**: Effective above `4 knots`, using hydrodynamic lift to pitch the boat and change depth.
-- **Variable Ballast (`AUX TRIM`)**: At very low speeds (`< 3 knots`), hydroplanes lose lift. Keep **`AUTO-NEUTRAL TRIM`** enabled so trim pumps automatically compensate for hull compression at depth.
-- **Emergency Main Ballast Tank (`EMBT`) Blow**: Clicking **`EMERGENCY EMBT BLOW!`** dumps `4500 PSI` compressed air directly into the Main Ballast Tanks, creating massive positive buoyancy to surface the submarine rapidly in an emergency.
+Contacts are generated from the simulator's acoustic profiles and mission scenarios. The game includes hostile submarines and surface combatants, friendly NATO units, commercial-style traffic, and biological contacts.
 
----
+- **HOSTILE** contacts are presented as threats.
+- **FRIENDLY** contacts represent allied units.
+- **NEUTRAL** contacts represent commercial-style shipping.
+- **BIOLOGIC** contacts represent whales and dolphins.
 
-## 9. Firing MK-48 ADCAP Torpedoes & VLS Missiles
+Commercial vessel names and AIS-like behavior are synthetic. The application does **not** connect to a live AIS data provider. Treat contact classification as a game mechanic; verify a contact using multiple displayed cues before engaging.
 
-Open **`[F3] FIRE CONTROL (WEPS)`**:
+## 6. Acoustic environment
 
-### Firing a Wire-Guided MK-48 Mod 7 ADCAP Torpedo
-1. Select a hostile track so its intercept heading populates **`LAUNCH GYRO HEADING`**.
-2. Set **`TORPEDO RUN DEPTH`** (`SURF 8m` for surface warships, or the target submarine's depth).
-3. Set **`SEEKER ENABLE RUN DISTANCE (YDS)`**: The torpedo will run straight for this distance before activating its acoustic seeker cone (preventing it from locking onto nearby neutral ships or your own submarine).
-4. Click **`FLOOD & OPEN`** on a dry tube (`4s`), then click **`FIRE TUBE`**.
-5. **Live Fiber-Optic Wire Guidance**: While the torpedo is running and **`WIRE ONLINE`** is displayed, you can steer the torpedo (`L 20°` / `R 20°`), change its depth (`SURF 15m` / `DEEP 165m`), or force its seeker active (`ENABLE NOW`). *Do not exceed `22 knots` own-ship speed or the guidance wire will snap!*
+The simulator models several environmental effects for gameplay:
 
-### Firing a VLS Harpoon or Tomahawk Missile
-1. Bring your submarine to **`<= 45m` depth** and **`<= 12 knots` speed**.
-2. Select a hostile surface warship (`depth 0m`).
-3. Click any ready **`VLS 1–6`** button (or **`LAUNCH MISSILE`** in the right sidebar). The encapsulated missile broaches the surface, ignites its booster, and skims the waves at **480 knots (Mach 0.8)** toward the target.
+- **Cavitation/noise:** own-ship noise changes with speed and operating conditions.
+- **Thermocline:** the simulated thermal layer can apply an acoustic propagation penalty between contacts on opposite sides.
+- **Baffles:** the bow-array blind arc is represented in the sonar display.
+- **Towed array:** the deployed/stowed state affects the tracking model.
+- **Sound velocity:** the displayed sound-velocity profile is calculated from the simulator's environmental model.
 
----
+The Mediterranean geography and seafloor model are procedural approximations. Third-party map tiles provide visual geographic context, but the simulator's underwater depth values are not a live bathymetric dataset and must not be used for navigation.
 
-## 10. Torpedo Defense & Evasion Tactics
+## 7. Reactor and propulsion
 
-When an enemy warship or submarine launches a **Yu-6** or **Yu-7** torpedo at you, the **`TORPEDO IN WATER`** master alarm flashes red:
-1. **Launch an ADC Mk 3 Acoustic Decoy**: Press **`C`** (or click **`LAUNCH NOISEMAKER`**) to drop a high-output acoustic jammer/decoy.
-2. **Cross the Thermocline Layer**: Dive below (or rise above) the `~88m` thermal layer so the incoming torpedo's seeker loses acoustic lock.
-3. **Execute an Evasive Knuckle**: Click **`EVASIVE KNUCKLE`** in Fire Control (or turn `90°–110°` away from the torpedo bearing at **Ahead Flank** with **Fast Coolant Pumps** enabled) to leave a turbulent cavitation wake knuckle between the torpedo and your hull.
+Open **F5 — S9G NUCLEAR REACTOR**.
 
----
+- **AUTO T-AVG REGULATOR:** lets the game adjust rod position to pursue its target average temperature.
+- **MANUAL RODS:** allows direct control of the rod-position slider.
+- **NAT CIRC:** lowest modeled pump-noise setting, with a lower supported power ceiling.
+- **SLOW PUMPS:** intermediate pump-noise and power setting.
+- **FAST PUMPS:** highest modeled pump-noise setting and the highest available coolant-flow capability.
 
-## 11. Saving, Loading & Exporting Patrols
+The current game model uses nominal safe-power limits of approximately 38% for natural circulation and 76% for slow pumps; fast pumps use a higher flow factor. Excessive modeled temperature or primary pressure can trigger an automatic **SCRAM**.
 
-- **Auto-Save**: Your entire patrol state (GPS coordinates, depth, reactor telemetry, tubes, contacts, and objectives) auto-saves to your browser's `localStorage` every **15 seconds**.
-- **Manual Save**: Click **`SAVE`** in the top station bar at any time.
-- **Resume Patrol**: When reopening the game, click **`RESUME SAVED PATROL`** in the command modal to continue right where you left off.
-- **Export Save (`.json`)**: Click **`EXPORT JSON`** in the command modal to download a portable snapshot of your patrol.
+After a SCRAM:
+1. Reduce propulsion demand.
+2. Allow the modeled SCRAM cooldown latch to expire.
+3. Select **RESET TRIP & PULL RODS** when the control accepts the reset.
+4. Monitor reactor output, temperatures, and propulsion response.
 
----
+The plant is a simplified simulation, not a thermohydraulic or nuclear engineering model. Values and procedures are gameplay parameters.
 
-## 12. Keyboard Shortcuts Reference
+## 8. Maneuvering, depth, and ballast
+
+Use the helm controls in the top command area or the F4 station.
+
+- Order a heading using the heading field and adjacent heading buttons.
+- Order a depth using the depth field and preset depth buttons.
+- Use bow/stern planes and rudder for manual maneuvering.
+- **AUTO DEPTH HOLD** provides automated depth control; **MANUAL PLANES** gives direct plane control.
+- Flood or blow the main ballast tanks using the MBT controls.
+- Use auxiliary trim controls to adjust the simulated trim balance.
+- **EMERGENCY EMBT BLOW!** triggers the game's emergency surfacing behavior.
+
+Depth changes, plane effectiveness, and ballast response are simplified. Monitor the displayed depth and seafloor clearance in the tactical HUD.
+
+## 9. Weapons and countermeasures
+
+### Torpedoes
+1. Select a hostile contact.
+2. In Fire Control, choose an available tube.
+3. Set the launch gyro heading, run depth, seeker-enable distance, and other available options.
+4. Use the tube's **FLOOD & OPEN** control.
+5. When the tube is ready, use **FIRE TUBE**.
+6. If wire guidance is available and online, use the in-game guidance controls to adjust the weapon.
+
+The torpedo seeker and guidance behavior are simulated. The displayed TMA estimate is not an independent real-world fire-control solution.
+
+### VLS
+Select an available VLS payload and use its launch control when the in-game launch conditions are met. The game models missile launch and target engagement at a simplified level.
+
+### Countermeasures
+- Use **LAUNCH NOISEMAKER [C]** to deploy an acoustic decoy when available.
+- Use **EVASIVE KNUCKLE** to trigger the game's evasive maneuver.
+- Monitor the **TORPEDO IN WATER** annunciator and tactical display.
+
+## 10. Periscope, radar, and ESM
+
+At suitable shallow depth, open **F6 — PERISCOPE / RADAR / ESM**.
+
+- Raise the scope to use the visual/FLIR display.
+- Adjust magnification and slew bearing.
+- Raise the ESM mast to display simulated emissions and transponder-related detections.
+- Use the radar transmit control to generate radar contacts in the game.
+
+Mast depth limits and sensor detections are enforced by the simulation. The ESM/AIS display is not connected to live external feeds.
+
+## 11. Save, resume, and export
+
+- **Autosave:** the game periodically stores patrol state in the browser's `localStorage`.
+- **SAVE:** use the top navigation button for a manual save.
+- **RESUME SAVED PATROL:** use the command modal to restore the saved patrol.
+- **SAVE NOW:** saves the current patrol from the command modal.
+- **EXPORT JSON:** downloads a JSON snapshot of the saved patrol.
+
+Saves are local to the browser profile and origin. Clearing site data, changing browser profiles, or using a different browser may make the saved patrol unavailable. Export JSON if you want a portable copy.
+
+## 12. Keyboard shortcuts
 
 | Key | Action |
-| :---: | :--- |
-| **`F1` – `F6`** | Switch between Tactical Map, Sonar, Weapons, Maneuvering, Reactor, and Periscope stations |
-| **`A` / `D`** | Turn ordered course Left `-5°` / Right `+5°` |
-| **`W` / `S`** | Order shallower depth `-10m` / deeper depth `+10m` (triggers Dive Klaxon) |
-| **`P`** | Transmit `3.5 kHz` Active Sonar Ping |
-| **`C`** | Launch ADC Mk 3 Acoustic Noisemaker Decoy |
-| **`ESC`** | Close Mission / Command Modal |
+| :---: | --- |
+| `F1` – `F6` | Switch between the six operator stations |
+| `A` / `D` | Order heading 5° left / right |
+| `W` / `S` | Order depth 10 m shallower / deeper |
+| `P` | Trigger active sonar ping |
+| `C` | Launch an acoustic decoy |
+| `ESC` | Close the command/mission modal |
+
+The keyboard shortcuts are ignored while an input or select field has focus. Some controls are available only through their on-screen buttons.
+
+## 13. Model limitations
+
+The application is a hobby simulation with realistic presentation, not a certified trainer or operational tool. Important simplifications include:
+
+- TMA estimates use simulated target truth rather than a genuine bearing-only estimator.
+- The LOFAR/DEMON-style plot is drawn from stored acoustic-profile data, not a signal-processing pipeline.
+- Commercial traffic is procedurally generated; no live AIS feed is consumed.
+- Underwater depth is procedurally approximated; online elevation lookup is not seafloor bathymetry.
+- Reactor, propulsion, sonar propagation, torpedo, and missile behavior are simplified gameplay models.
+
+Use the simulator for experimentation and entertainment, not real-world navigation, engineering, or tactical decisions.
