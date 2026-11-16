@@ -1759,6 +1759,11 @@ class SubmarineWorld {
 
     // Global Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        modal.style.display = 'none';
+        if (optionsModal) optionsModal.style.display = 'none';
+        return;
+      }
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
       if (e.key === 'F1') { e.preventDefault(); this.switchStation('tactical'); }
       if (e.key === 'F2') { e.preventDefault(); this.switchStation('sonar'); }
@@ -1767,7 +1772,6 @@ class SubmarineWorld {
       if (e.key === 'F5') { e.preventDefault(); this.switchStation('reactor'); }
       if (e.key === 'F6') { e.preventDefault(); this.switchStation('periscope'); }
       if (e.key === 'F7') { e.preventDefault(); this.switchStation('damage-control'); }
-      if (e.key === 'Escape') { modal.style.display = 'none'; }
       if (e.key === 'a' || e.key === 'A') applyOrderHdg(this.ownSub.orderedHeading - 5);
       if (e.key === 'd' || e.key === 'D') applyOrderHdg(this.ownSub.orderedHeading + 5);
       if (e.key === 'w' || e.key === 'W') applyOrderDepth(this.ownSub.orderedDepthM - 10);
