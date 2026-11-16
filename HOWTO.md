@@ -267,23 +267,29 @@ Use the simulator for experimentation and entertainment, not real-world navigati
 
 Crew communications use a separate local neural TTS process powered by HeadTTS and the Kokoro model. The simulator remains a browser application; the TTS server runs as a separate Node.js process on the same computer.
 
-### Start the local voice engine
+### Start the complete simulator
 
 Requirements:
 - Node.js 20 or newer.
 - Git.
-- An internet connection for the first installation and model/voice download.
+- Python 3.
+- An internet connection for first-time installation and model download.
 
-From the simulator project directory, open a terminal and run:
+From the simulator project directory, run this single command:
 
 ```bash
-node tts-server/start.mjs
+bash start-local.sh
 ```
 
-The bootstrapper clones the upstream HeadTTS project into `~/.submarine-headtts` (outside the simulator repository), installs its dependencies on first run, and starts the local REST server at `http://127.0.0.1:8882`. The model is cached on the computer after its first download. Leave this terminal running while playing; **Ctrl+C** stops the service.
+The script starts both the simulator HTTP server (`127.0.0.1:8080`) and the local HeadTTS/Kokoro server (`127.0.0.1:8882`), waits until both respond, then opens the simulator in your browser. Keep the terminal open while playing. Press **Ctrl+C** to stop the services that the launcher started; a pre-existing HeadTTS process is reused and is not stopped.
 
-The launcher applies a small local-only patch to the upstream server so it binds to `127.0.0.1` rather than all network interfaces. If the upstream implementation changes and the patch cannot be applied safely, startup stops and reports the issue.
+Use `SIM_PORT=8090 bash start-local.sh` to select another HTTP port, or `bash start-local.sh --no-open` to keep the browser from opening automatically.
 
+The first launch clones HeadTTS into `~/.submarine-headtts`, installs dependencies, and downloads/caches model assets. This can take several minutes. Logs are written to `~/.submarine-simulator/logs/`.
+
+For manual operation, the two processes can still be started separately with `python3 -m http.server 8080 --bind 127.0.0.1` and `node tts-server/start.mjs`.
+
+The TTS launcher applies a local-only patch to the upstream server so its unauthenticated REST listener binds to `127.0.0.1`, not all network interfaces. If the upstream implementation changes and the patch cannot be applied safely, startup stops and reports the issue.
 ### Configure the crew
 
 Open **OPTIONS** from the command bar:
