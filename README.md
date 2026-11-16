@@ -60,7 +60,7 @@ submarine/
 ├── css/
 │   └── style.css       # 90s MIL-STD-1472 CRT green/amber/cyan phosphor styling
 └── js/
-    ├── audio.js        # Procedural Web Audio synthesizer & hydrophone audio monitor
+    ├── simulation-clock.js # Fixed-step simulation clock\n    ├── audio.js        # Procedural Web Audio synthesizer & hydrophone audio monitor
     ├── bathymetry.js   # Mediterranean Sea bathymetry, thermocline & geodesy engine
     ├── reactor.js      # General Electric S9G PWR nuclear reactor & steam plant physics
     ├── physics.js      # Submarine 6-DOF hydrodynamics, ballast, cavitation & sonar SNR
@@ -72,7 +72,7 @@ submarine/
 
 ---
 
-## Running Locally
+## Development Tests\n\nThe simulation clock unit tests run with Node.js (no dependencies):\n\n```bash\nnode --test tests/*.test.js\n```\n\n## Running Locally
 
 No build tools or external dependencies are required.
 
