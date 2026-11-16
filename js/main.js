@@ -1618,6 +1618,9 @@ class SubmarineWorld {
       window.Stations.scopeZoom = window.Stations.scopeZoom === 1.5 ? 4.0 : 1.5;
       e.target.textContent = `ZOOM ${window.Stations.scopeZoom.toFixed(1)}×`;
     });
+    document.getElementById('btn-scope-weather').addEventListener('click', (e) => {
+      e.target.textContent = 'METEO: ' + window.Stations.cycleScopeWeather();
+    });
     document.getElementById('btn-scope-left').addEventListener('click', () => {
       window.Stations.scopeBearing = (window.Stations.scopeBearing - 10 + 360) % 360;
       document.getElementById('scope-brg-val').textContent = `${window.Stations.scopeBearing.toString().padStart(3, '0')}° TRUE`;
