@@ -15,21 +15,21 @@ class ContactEntity {
 
     this.lat = config.lat;
     this.lon = config.lon;
-    this.heading = config.heading || 0;
+    this.heading = config.heading ?? 0;
     this.orderedHeading = config.orderedHeading !== undefined ? config.orderedHeading : this.heading;
-    this.speedKts = config.speedKts || 10;
+    this.speedKts = config.speedKts ?? 10;
     this.orderedSpeedKts = config.orderedSpeedKts !== undefined ? config.orderedSpeedKts : this.speedKts;
-    this.depthM = config.depthM || 0;
+    this.depthM = config.depthM ?? 0;
     this.orderedDepthM = config.orderedDepthM !== undefined ? config.orderedDepthM : this.depthM;
 
     this.aiBehavior = config.aiBehavior || 'PATROL_TRANSIT';
     this.aiState = config.aiState || 'PATROL'; // 'PATROL', 'INVESTIGATE', 'ATTACK', 'EVADE'
     this.alertedBearing = config.alertedBearing !== undefined ? config.alertedBearing : null;
-    this.activeSonarCooldown = config.activeSonarCooldown || (25 + Math.random() * 35);
-    this.weaponReloadTimer = config.weaponReloadTimer || 15;
+    this.activeSonarCooldown = config.activeSonarCooldown ?? (25 + Math.random() * 35);
+    this.weaponReloadTimer = config.weaponReloadTimer ?? 15;
     this.torpedoesRemaining = config.torpedoesRemaining !== undefined ? config.torpedoesRemaining : (this.profile.torpedoCount || 0);
     this.decoysRemaining = config.decoysRemaining !== undefined ? config.decoysRemaining : 4;
-    this.bioWanderTimer = 20 + Math.random() * 40;
+    this.bioWanderTimer = config.bioWanderTimer ?? (20 + Math.random() * 40);
 
     this.hp = config.hp !== undefined ? config.hp : this.profile.hitPoints;
     this.maxHp = this.profile.hitPoints;
@@ -66,6 +66,7 @@ class ContactEntity {
       alertedBearing: this.alertedBearing,
       activeSonarCooldown: this.activeSonarCooldown,
       weaponReloadTimer: this.weaponReloadTimer,
+      bioWanderTimer: this.bioWanderTimer,
       torpedoesRemaining: this.torpedoesRemaining,
       decoysRemaining: this.decoysRemaining,
       hp: this.hp,
@@ -337,15 +338,15 @@ class WeaponEntity {
 
     this.lat = config.lat;
     this.lon = config.lon;
-    this.depthM = config.depthM || 40;
-    this.orderedDepthM = config.orderedDepthM || 40;
+    this.depthM = config.depthM ?? 40;
+    this.orderedDepthM = config.orderedDepthM ?? 40;
     this.heading = config.heading || 0;
     this.orderedHeading = config.orderedHeading !== undefined ? config.orderedHeading : this.heading;
-    this.speedKts = config.speedKts || 40;
+    this.speedKts = config.speedKts ?? 40;
 
-    this.runDistanceYds = config.runDistanceYds || 0;
+    this.runDistanceYds = config.runDistanceYds ?? 0;
     this.maxRunYds = this.type === 'MISSILE' ? 95000 : 36000;
-    this.enableDistanceYds = config.enableDistanceYds || 1200;
+    this.enableDistanceYds = config.enableDistanceYds ?? 1200;
 
     this.seekerMode = config.seekerMode || 'ACTIVE_PASSIVE';
     this.searchPattern = config.searchPattern || 'SNAKE';
@@ -353,7 +354,7 @@ class WeaponEntity {
     this.wireConnected = config.wireConnected !== undefined ? config.wireConnected : (this.isPlayer && this.type === 'TORPEDO');
     this.lockedTarget = null;
     this.exploded = Boolean(config.exploded);
-    this.snakePhase = config.snakePhase || 0;
+    this.snakePhase = config.snakePhase ?? 0;
   }
 
   serialize() {
