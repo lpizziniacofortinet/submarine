@@ -262,6 +262,7 @@ class ContactEntity {
       listenerHeading: ownSub.heading,
       listenerSpeedKts: ownSub.speedKts,
       listenerHasTowedArray: ownSub.towedArrayDeployed,
+      listenerBowArrayHealth: ownSub.damageControl.getSystemHealth('sonar'),
       thermoclineDepthM
     });
 
