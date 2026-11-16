@@ -1,0 +1,41 @@
+'use strict';
+
+const test = require('node:test');
+const assert = require('node:assert/strict');
+
+global.window = global;
+window.Bathymetry = { features: [] };
+window.localStorage = {
+  getItem() { return null; },
+  setItem() {},
+  removeItem() {}
+};
+global.fetch = async () => { throw new Error('offline test'); };
+
+require('../js/med-landmask.js');
+require('../js/coastline.js');
+
+const CoastlineModel = window.CoastlineModel;
+
+test('local land mask distinguishes Mediterranean coast from nearby water', () => {
+  assert.equal(CoastlineModel.isLand(44.1, 9.82), true, 'La Spezia land');
+  assert.equal(CoastlineModel.isLand(43.9, 10.2), false, 'offshore Tyrrhenian water');
+  assert.equal(CoastlineModel.isLand(40.47, 17.23), true, 'Taranto land');
+  assert.equal(CoastlineModel.isLand(40.25, 17.6), false, 'Gulf of Taranto water');
+  assert.equal(CoastlineModel.isLand(35.3, 24.8), true, 'Crete land');
+  assert.equal(CoastlineModel.isLand(35.2, 23.8), false, 'south of Crete');
+});
+
+test('fallback profile contains 72 bearings and detects coast from offshore', () => {
+  const profile = CoastlineModel.buildFallbackProfile(43.9, 10.2);
+  assert.equal(profile.fallback, true);
+  assert.equal(profile.rays.length, 72);
+  assert.ok(profile.rays.some((ray) => ray.hasLand), 'at least one coastline ray is visible');
+});
+
+test('local land profile is available immediately while the DEM request is loading', () => {
+  const model = new CoastlineModel();
+  model.updatePosition(43.9, 10.2);
+  assert.ok(model.profile);
+  assert.equal(model.profile.fallback, true);
+});
