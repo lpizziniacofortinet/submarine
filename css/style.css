@@ -156,20 +156,30 @@ body.red-alert {
 /* Station Navigation Tabs */
 #station-nav {
   display: flex;
-  flex-wrap: wrap;
-  align-content: center;
+  flex-direction: column;
+  flex-wrap: nowrap;
   background: #0a140e;
   border-bottom: 2px solid var(--border-color);
   height: auto;
-  min-height: 32px;
+  min-height: 56px;
   padding: 3px 6px;
   gap: 4px;
-  align-items: center;
+  align-items: stretch;
   flex-shrink: 0;
 }
 
-#station-nav > .station-tab,
-#station-nav > .mil-btn {
+#station-primary-row {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  white-space: nowrap;
+  scrollbar-width: thin;
+}
+
+#station-primary-row > .station-tab,
+#station-primary-row > .mil-btn {
   flex-shrink: 0;
   white-space: nowrap;
 }
@@ -207,13 +217,25 @@ body.red-alert {
 
 .nav-spacer {
   flex: 1;
+  min-width: 8px;
 }
 
-/* Warning Annunciator Lights in Nav Bar */
+/* Warning annunciators occupy their own row to avoid collisions with controls. */
 #annunciator-strip {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
+  align-items: center;
+  justify-content: flex-end;
   gap: 4px;
+  min-width: 0;
+  overflow-x: auto;
+  padding-top: 3px;
+  border-top: 1px solid #17301f;
+  scrollbar-width: thin;
+}
+
+#annunciator-strip .annunciator {
+  flex: 0 0 auto;
 }
 
 .annunciator {
@@ -676,7 +698,7 @@ select.mil-select, input.mil-input {
 /* On-Screen Dismissible Tactical Message Popups */
 #tactical-alert-stack {
   position: fixed;
-  top: 102px;
+  top: 138px;
   right: 322px;
   z-index: 1500;
   display: flex;
