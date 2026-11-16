@@ -139,9 +139,21 @@ class SubmarineWorld {
       const rawDt = Math.max(0, (now - lastTimestamp) / 1000.0);
       lastTimestamp = now;
       const compression = Math.max(0, this.timeCompression);
-      this.simulationClock.advance(rawDt * compression, (fixedDt) => {
-        this.stepSimulation(fixedDt, compression > 0 ? fixedDt / compression : 0);
-      });
+
+      // Keep the wall-clock stall limit independent from time compression.
+      // At 10x, a normal 30 FPS frame represents ~0.333s of simulation time;
+      // the clock must be allowed enough fixed substeps to process it instead
+      // of clamping it to the 1x 0.25s budget and silently losing simulation time.
+      if (compression > 0) {
+        this.simulationClock.maxFrameDeltaSec = 0.25 * compression;
+        this.simulationClock.maxSubSteps = Math.max(
+          1,
+          Math.ceil(this.simulationClock.maxFrameDeltaSec / this.simulationClock.fixedStepSec)
+        );
+        this.simulationClock.advance(rawDt * compression, (fixedDt) => {
+          this.stepSimulation(fixedDt, fixedDt / compression);
+        });
+      }
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
