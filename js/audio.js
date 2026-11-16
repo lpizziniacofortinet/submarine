@@ -145,7 +145,7 @@ class SubAudioEngine {
     };
 
     this.preferredVoice = this.availableVoices
-      .slice()
+      .filter((voice) => String(voice.lang || '').toLowerCase().startsWith('en'))
       .sort((a, b) => score(b) - score(a))[0] || null;
     return this.availableVoices;
   }
@@ -172,6 +172,7 @@ class SubAudioEngine {
       .replace(/°/g, ' degrees ')
       .replace(/\bKT\b/gi, ' knots ')
       .replace(/\s+/g, ' ');
+      .replace(/\s+([,!.?])/g, '$1');
     const callsign = station === 'SONAR' ? 'Sonar, Conn.' :
       station === 'WEPS' ? 'Weapons, Conn.' :
       station === 'ENG' ? 'Engineering, Conn.' : 'Conn.';
