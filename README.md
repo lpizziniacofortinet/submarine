@@ -26,6 +26,7 @@ The project is built with HTML5, CSS, Canvas, and vanilla JavaScript. It has no 
 - TMA-style tracking display, bearing-rate information, estimated range, and contact course/speed.
 - Simplified thermocline, sound-speed, propagation-loss, cavitation, and baffle effects.
 - Leaflet tactical map with selectable map layers, nautical overlays, waypoints, and bathymetry probes.
+- Periscope coastal and mountain skyline from Copernicus DEM GLO-90 elevation samples, with Earth-curvature correction and simple CLEAR / HAZE / FOG visibility presets.
 
 ### Persistence and simulation controls
 - Fixed-step simulation clock.
@@ -70,7 +71,7 @@ py -m http.server 8080
 
 Opening `index.html` directly may work, but serving the files over HTTP is recommended for browser API and asset compatibility.
 
-An internet connection is required for third-party map tiles and the optional online elevation request. Core simulation logic runs locally; map layers and online probes may be unavailable offline.
+An internet connection is required for third-party map tiles, the periscope's first terrain lookup at a new patrol location, and the optional online bathymetry probe. The periscope elevation profile is cached locally for 30 days and falls back to a sea-only horizon if unavailable. Terrain attribution is displayed in the periscope console: Copernicus DEM GLO-90 via Open-Meteo. See [Open-Meteo Elevation API](https://open-meteo.com/en/docs/elevation-api). Core simulation logic runs locally; map layers and online probes may be unavailable offline.
 
 ## Tests
 

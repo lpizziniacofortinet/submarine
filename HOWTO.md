@@ -215,6 +215,10 @@ At suitable shallow depth, open **F6 — PERISCOPE / RADAR / ESM**.
 
 Mast depth limits and sensor detections are enforced by the simulation. The ESM/AIS display is not connected to live external feeds.
 
+The optical picture includes a 360-degree terrain profile derived from Copernicus DEM GLO-90 elevation samples via the Open-Meteo Elevation API. It accounts for Earth curvature and a standard optical-refraction approximation. The first lookup at a new approximate position needs an internet connection; profiles are cached locally for 30 days. If the service is unavailable, the display falls back to a sea-only horizon.
+
+Use **METEO** to cycle through simplified optical visibility presets: CLEAR (55 km), HAZE (24 km), and FOG (7 km). These are visual presets, not a full weather simulation. Terrain attribution is shown beneath the periscope image (Copernicus DEM GLO-90 / Open-Meteo).
+
 ## 11. Save, resume, and export
 
 - **Autosave:** the game periodically stores patrol state in the browser's `localStorage`.

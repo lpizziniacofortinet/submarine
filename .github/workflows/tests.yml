@@ -18,3 +18,8 @@ jobs:
           node-version: 20
       - name: Run tests
         run: node --test tests/*.test.js
+      - name: Check simulator JavaScript syntax
+        run: |
+          node --check js/main.js
+          node --check js/stations.js
+          node --check js/coastline.js

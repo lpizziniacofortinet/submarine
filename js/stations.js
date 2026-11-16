@@ -25,8 +25,18 @@ class StationRenderers {
 
     // Periscope state
     this.scopeBearing = 90;
-    this.scopeThermal = true;
+    this.scopeThermal = false;
     this.scopeZoom = 1.5;
+    this.coastlineModel = window.CoastlineModel ? new window.CoastlineModel() : null;
+    this.scopeWeatherIndex = 0;
+    this.scopeWeatherModes = [
+      { name: 'CLEAR', visibilityKm: 55, hazeAlpha: 0.015 },
+      { name: 'HAZE', visibilityKm: 24, hazeAlpha: 0.105 },
+      { name: 'FOG', visibilityKm: 7, hazeAlpha: 0.27 }
+    ];
+    this.scopeVisibilityKm = this.scopeWeatherModes[0].visibilityKm;
+    this.scopeHazeAlpha = this.scopeWeatherModes[0].hazeAlpha;
+
 
     // Radar sweep angle
     this.radarSweepDeg = 0;
@@ -975,89 +985,438 @@ class StationRenderers {
     ctx.fillText(`DIESEL: ${rx.dieselRunning ? 'RUNNING' : 'STANDBY'}`, turbX + 10, batY + 50);
   }
 
+  cycleScopeWeather() {
+    this.scopeWeatherIndex = (this.scopeWeatherIndex + 1) % this.scopeWeatherModes.length;
+    const mode = this.scopeWeatherModes[this.scopeWeatherIndex];
+    this.scopeVisibilityKm = mode.visibilityKm;
+    this.scopeHazeAlpha = mode.hazeAlpha;
+    return mode.name;
+  }
+
   /**
    * Renders Station 6 Photonics Periscope & Radar/ESM PPI Scope
    */
   renderPeriscopeStation(world) {
     const scopeCanvas = document.getElementById('periscope-canvas');
     if (scopeCanvas) {
-      if (scopeCanvas.width !== scopeCanvas.clientWidth || scopeCanvas.height !== scopeCanvas.clientHeight) {
-        scopeCanvas.width = scopeCanvas.clientWidth || 560;
-        scopeCanvas.height = scopeCanvas.clientHeight || 380;
+      const pixelRatio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+      const displayW = Math.max(320, scopeCanvas.clientWidth || 720);
+      const displayH = Math.max(240, scopeCanvas.clientHeight || 420);
+
+      if (scopeCanvas.width !== Math.round(displayW * pixelRatio) ||
+          scopeCanvas.height !== Math.round(displayH * pixelRatio)) {
+        scopeCanvas.width = Math.round(displayW * pixelRatio);
+        scopeCanvas.height = Math.round(displayH * pixelRatio);
       }
 
       const ctx = scopeCanvas.getContext('2d');
-      const w = scopeCanvas.width;
-      const h = scopeCanvas.height;
+      ctx.setTransform(pixelRatio, 0, 0, pixelRatio, 0, 0);
+      const w = displayW;
+      const h = displayH;
       const sub = world.ownSub;
+      const raised = Boolean(sub.periscopeRaised && sub.depthM <= 20.5);
+      if (raised && this.coastlineModel) this.coastlineModel.updatePosition(sub.lat, sub.lon);
+      const terrainProfile = this.coastlineModel ? this.coastlineModel.profile : null;
+      const terrainStatus = this.coastlineModel ? this.coastlineModel.status : 'UNAVAILABLE';
+      const terrainStatusEl = document.getElementById('scope-terrain-status');
+      if (terrainStatusEl) {
+        terrainStatusEl.textContent = raised ? 'TERRAIN DATA: ' + terrainStatus : 'TERRAIN DATA: STANDBY';
+        terrainStatusEl.dataset.state = raised ? String(terrainStatus).toLowerCase() : 'standby';
+      }
+      const thermal = Boolean(this.scopeThermal);
+      const liveMark = scopeCanvas.parentElement?.querySelector('.scope-live-mark');
+      if (liveMark) {
+        liveMark.style.display = raised ? 'flex' : 'none';
+        liveMark.lastChild.textContent = thermal ? ' FLIR SENSOR' : ' EO SENSOR';
+      }
+      const zoom = this.scopeZoom || 1.5;
+      const fovDeg = 48 / zoom;
+      const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
+      const simSeconds = Number.isFinite(world.simTimeSec) ? world.simTimeSec : 0;
+      const simHours = ((simSeconds / 3600) % 24 + 24) % 24;
+      const clock = (() => {
+        const total = Math.floor(simSeconds) % 86400;
+        const hh = String(Math.floor(total / 3600)).padStart(2, '0');
+        const mm = String(Math.floor((total % 3600) / 60)).padStart(2, '0');
+        const ss = String(total % 60).padStart(2, '0');
+        return `${hh}:${mm}:${ss}Z`;
+      })();
 
-      if (!sub.periscopeRaised || sub.depthM > 20.5) {
-        ctx.fillStyle = '#020604';
+      const drawText = (text, x, y, size = 10, color = '#c8d8e3', weight = 600, align = 'left') => {
+        ctx.font = `${weight} ${size}px Arial, Helvetica, sans-serif`;
+        ctx.textAlign = align;
+        ctx.textBaseline = 'middle';
+        ctx.fillStyle = color;
+        ctx.fillText(String(text), x, y);
+      };
+
+      const drawPanel = (x, y, width, height, fill = 'rgba(7, 18, 29, 0.86)') => {
+        ctx.fillStyle = fill;
+        ctx.fillRect(x, y, width, height);
+        ctx.strokeStyle = 'rgba(142, 177, 199, 0.34)';
+        ctx.lineWidth = 1;
+        ctx.strokeRect(x + 0.5, y + 0.5, width - 1, height - 1);
+      };
+
+      const drawCornerFrame = (color) => {
+        const inset = 9;
+        const len = 24;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(inset, inset + len); ctx.lineTo(inset, inset); ctx.lineTo(inset + len, inset);
+        ctx.moveTo(w - inset - len, inset); ctx.lineTo(w - inset, inset); ctx.lineTo(w - inset, inset + len);
+        ctx.moveTo(inset, h - inset - len); ctx.lineTo(inset, h - inset); ctx.lineTo(inset + len, h - inset);
+        ctx.moveTo(w - inset - len, h - inset); ctx.lineTo(w - inset, h - inset); ctx.lineTo(w - inset, h - inset - len);
+        ctx.stroke();
+      };
+
+      // Retracted state: a clean system slate, with a real depth interlock.
+      if (!raised) {
+        const bg = ctx.createLinearGradient(0, 0, w, h);
+        bg.addColorStop(0, '#1b2b39');
+        bg.addColorStop(0.52, '#0e1b28');
+        bg.addColorStop(1, '#07111b');
+        ctx.fillStyle = bg;
         ctx.fillRect(0, 0, w, h);
-        ctx.fillStyle = '#ffb000';
-        ctx.font = 'bold 13px Courier New';
-        ctx.fillText('AN/BVS-1 PHOTONICS MAST RETRACTED', w / 2 - 145, h / 2 - 10);
-        ctx.fillStyle = '#00ff66';
-        ctx.font = '11px Courier New';
-        ctx.fillText('Maintain Periscope Depth (<= 20m) and click [RAISE SCOPE]', w / 2 - 190, h / 2 + 15);
+
+        ctx.strokeStyle = 'rgba(108, 146, 171, 0.10)';
+        ctx.lineWidth = 1;
+        for (let x = 0; x < w; x += 34) {
+          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+        }
+        for (let y = 0; y < h; y += 34) {
+          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+        }
+
+        drawPanel(18, 18, w - 36, 34, 'rgba(5, 13, 21, 0.68)');
+        drawText('AN/BVS-1  /  PHOTONICS SENSOR CONTROL', 31, 35, 10, '#a9c0d0', 700);
+        drawText(clock, w - 31, 35, 10, '#91aabd', 600, 'right');
+
+        const boxW = Math.min(440, w - 48);
+        const boxH = 154;
+        const bx = (w - boxW) / 2;
+        const by = (h - boxH) / 2 - 2;
+        drawPanel(bx, by, boxW, boxH, 'rgba(5, 14, 23, 0.78)');
+
+        const gx = w / 2;
+        const gy = by + 37;
+        ctx.strokeStyle = sub.depthM > 20.5 ? '#d4a05d' : '#75a9bf';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(gx, gy, 13, 0, Math.PI * 2);
+        ctx.moveTo(gx - 21, gy + 22); ctx.lineTo(gx + 21, gy + 22);
+        ctx.moveTo(gx, gy + 14); ctx.lineTo(gx, gy + 22);
+        ctx.moveTo(gx - 16, gy + 22); ctx.lineTo(gx - 16, gy + 29);
+        ctx.moveTo(gx + 16, gy + 22); ctx.lineTo(gx + 16, gy + 29);
+        ctx.stroke();
+        ctx.fillStyle = sub.depthM > 20.5 ? '#d4a05d' : '#75a9bf';
+        ctx.beginPath(); ctx.arc(gx, gy, 4, 0, Math.PI * 2); ctx.fill();
+
+        const interlocked = sub.depthM > 20.5;
+        drawText(interlocked ? 'DEPTH INTERLOCK' : 'MAST STOWED', gx, by + 83, 16,
+          interlocked ? '#e2b16b' : '#d3e0e9', 700, 'center');
+        drawText(
+          interlocked
+            ? 'MAST DEPLOYMENT INHIBITED  /  REDUCE DEPTH TO 20.0 m OR LESS'
+            : 'OPTICAL CHANNEL STANDBY  /  RAISE MAST TO ACQUIRE LIVE PICTURE',
+          gx, by + 109, 9, '#8da9ba', 600, 'center'
+        );
+        drawText(`OWN DEPTH  ${sub.depthM.toFixed(1)} m`, gx, by + 133, 10,
+          interlocked ? '#e2b16b' : '#a8c1cf', 700, 'center');
+
+        drawPanel(18, h - 37, w - 36, 22, 'rgba(5, 13, 21, 0.72)');
+        drawText('EO SENSOR  /  CHANNEL OFFLINE', 30, h - 26, 9, '#8299a9', 700);
+        drawText('STABILIZATION: STANDBY', w - 30, h - 26, 9, '#8299a9', 600, 'right');
+        drawCornerFrame('rgba(133, 164, 185, 0.45)');
       } else {
-        const horizonY = h * 0.52 + sub.pitchDeg * 3.5;
+        const daylight = clamp(Math.sin(((simHours - 6) / 12) * Math.PI), 0, 1);
+        const horizonY = clamp(h * 0.47 + clamp(sub.pitchDeg || 0, -12, 12) * 2.4, h * 0.30, h * 0.65);
+        const skyTop = thermal ? '#303a40' : (daylight > 0.35 ? '#6d8e9d' : '#172a3b');
+        const skyBottom = thermal ? '#9aa7aa' : (daylight > 0.35 ? '#b4c0bd' : '#3b5263');
+        const seaTop = thermal ? '#46545a' : (daylight > 0.35 ? '#577887' : '#233c4d');
+        const seaBottom = thermal ? '#101a20' : (daylight > 0.35 ? '#15394b' : '#071724');
 
-        // Sky & Sea Gradient (Thermal FLIR Green/Cyan vs Optical)
-        ctx.fillStyle = this.scopeThermal ? '#04170c' : '#0a2236';
+        const sky = ctx.createLinearGradient(0, 0, 0, horizonY);
+        sky.addColorStop(0, skyTop);
+        sky.addColorStop(1, skyBottom);
+        ctx.fillStyle = sky;
         ctx.fillRect(0, 0, w, horizonY);
-        ctx.fillStyle = this.scopeThermal ? '#020b06' : '#04101c';
-        ctx.fillRect(0, horizonY, w, h - horizonY);
 
-        // Draw Surface Contacts in Field of View (±30° / zoom)
-        const fovDeg = 48 / this.scopeZoom;
-        for (const c of world.contacts) {
-          if (c.sunk || c.depthM > 5) continue;
-          const brg = window.Bathymetry.bearingDeg(sub.lat, sub.lon, c.lat, c.lon);
-          const rngNm = window.Bathymetry.distanceNm(sub.lat, sub.lon, c.lat, c.lon);
-          if (rngNm > 12.0) continue;
+        const haze = ctx.createLinearGradient(0, horizonY - 22, 0, horizonY + 24);
+        haze.addColorStop(0, 'rgba(216, 226, 225, 0)');
+        haze.addColorStop(0.55, thermal ? 'rgba(220, 228, 224, 0.30)' : 'rgba(210, 224, 225, 0.34)');
+        haze.addColorStop(1, 'rgba(216, 226, 225, 0)');
+        ctx.fillStyle = haze;
+        ctx.fillRect(0, horizonY - 22, w, 46);
 
-          let relAngle = ((brg - this.scopeBearing + 540) % 360) - 180;
-          if (Math.abs(relAngle) <= fovDeg / 2) {
-            const sx = w / 2 + (relAngle / (fovDeg / 2)) * (w / 2);
-            const scale = Math.max(0.18, Math.min(2.8, (3.2 / Math.max(0.4, rngNm)) * (this.scopeZoom * 0.65)));
-            const shipW = 68 * scale;
-            const shipH = 22 * scale;
-
-            // Ship hull + superstructure silhouette on horizon
-            ctx.fillStyle = this.scopeThermal ? '#00ff66' : '#8aa6b8';
-            ctx.fillRect(sx - shipW / 2, horizonY - shipH * 0.45, shipW, shipH * 0.45);
-            ctx.fillRect(sx - shipW * 0.2, horizonY - shipH, shipW * 0.35, shipH * 0.55);
-
-            // Bow wake
-            ctx.strokeStyle = '#00e5ff';
-            ctx.beginPath();
-            ctx.moveTo(sx - shipW * 0.6, horizonY + 2);
-            ctx.lineTo(sx + shipW * 0.6, horizonY + 2);
-            ctx.stroke();
-
-            // Target HUD tag
-            ctx.fillStyle = '#ffb000';
-            ctx.font = '10px Courier New';
-            ctx.fillText(`${c.designation} (${rngNm.toFixed(1)} NM)`, sx - 38, horizonY - shipH - 8);
+        if (!thermal) {
+          for (let i = 0; i < 5; i++) {
+            const cloudX = ((i * 197 + 90 + simSeconds * (0.18 + i * 0.015)) % (w + 180)) - 90;
+            const cloudY = 28 + (i % 3) * 22 + (i % 2) * 8;
+            const cloud = ctx.createRadialGradient(cloudX, cloudY, 4, cloudX, cloudY, 62 + (i % 3) * 15);
+            cloud.addColorStop(0, daylight > 0.25 ? 'rgba(235, 239, 234, 0.20)' : 'rgba(147, 166, 180, 0.10)');
+            cloud.addColorStop(1, 'rgba(210, 225, 232, 0)');
+            ctx.fillStyle = cloud;
+            ctx.fillRect(cloudX - 80, cloudY - 32, 160, 64);
           }
         }
 
-        // Periscope Stadimeter Crosshairs & Reticle
-        ctx.strokeStyle = 'rgba(0, 255, 102, 0.55)';
-        ctx.lineWidth = 1;
+        const sea = ctx.createLinearGradient(0, horizonY, 0, h);
+        sea.addColorStop(0, seaTop);
+        sea.addColorStop(1, seaBottom);
+        ctx.fillStyle = sea;
+        ctx.fillRect(0, horizonY, w, h - horizonY);
+
+        // Geographic coastline silhouette from the local Copernicus DEM profile.
+        // The DEM rays already include Earth curvature and a modest standard
+        // optical refraction correction; the 2D renderer only projects the skyline.
+        if (terrainProfile && terrainProfile.rays && terrainProfile.rays.length) {
+          const seaHorizon = terrainProfile.seaHorizonAngleDeg;
+          const verticalScale = 24;
+          const sampleCount = Math.max(100, Math.ceil(w / 4));
+          const skyline = [];
+          for (let i = 0; i <= sampleCount; i++) {
+            const x = (i / sampleCount) * w;
+            const relativeBearing = ((i / sampleCount) - 0.5) * fovDeg;
+            const bearing = (this.scopeBearing + relativeBearing + 360) % 360;
+            const ray = window.CoastlineModel.sample(terrainProfile, bearing);
+            const landRise = ray && ray.hasLand ? Math.max(0, ray.angleDeg - seaHorizon) : 0;
+            const y = horizonY - Math.min(h * 0.34, landRise * verticalScale);
+            skyline.push({ x, y, rangeKm: ray && ray.hasLand ? ray.rangeKm : 0, hasLand: Boolean(ray && ray.hasLand) });
+          }
+
+          for (let i = 0; i < skyline.length - 1; i++) {
+            const a = skyline[i];
+            const b = skyline[i + 1];
+            if (!a.hasLand && !b.hasLand) continue;
+            const rangeKm = (a.rangeKm + b.rangeKm) * 0.5;
+            const haze = clamp(1 - Math.max(0, rangeKm - 8) / (this.scopeVisibilityKm * 1.35), 0.18, 0.88);
+            const base = thermal ? [35, 48, 54] : [29, 48, 59];
+            const fog = thermal ? [150, 163, 164] : [127, 151, 159];
+            const mix = clamp(1 - haze, 0, 1);
+            const color = base.map((value, channel) => Math.round(value * haze + fog[channel] * mix));
+            ctx.fillStyle = 'rgba(' + color.join(',') + ',0.96)';
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.lineTo(b.x, horizonY + 18);
+            ctx.lineTo(a.x, horizonY + 18);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = thermal ? 'rgba(220, 229, 223,' + (0.42 * haze + 0.12) + ')' :
+              'rgba(205, 222, 226,' + (0.45 * haze + 0.10) + ')';
+            ctx.lineWidth = 1.1;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
+
+        const wavePhase = simSeconds * 0.85;
+        for (let i = 0; i < 15; i++) {
+          const y = horizonY + 8 + i * i * 1.08;
+          if (y > h - 35) break;
+          const alpha = (thermal ? 0.10 : 0.12) + i * 0.008;
+          ctx.strokeStyle = thermal
+            ? `rgba(223, 232, 229, ${alpha})`
+            : `rgba(195, 218, 223, ${alpha})`;
+          ctx.lineWidth = i < 5 ? 0.7 : 1;
+          ctx.beginPath();
+          for (let x = -12; x <= w + 12; x += 12) {
+            const amp = 1.0 + i * 0.10;
+            const yy = y + Math.sin(x * 0.026 + wavePhase + i * 1.7) * amp
+              + Math.sin(x * 0.009 - wavePhase * 0.55 + i) * amp * 0.65;
+            if (x === -12) ctx.moveTo(x, yy);
+            else ctx.lineTo(x, yy);
+          }
+          ctx.stroke();
+        }
+
+        // Simple optical attenuation presets: clear, haze and fog.
+        if (this.scopeHazeAlpha > 0) {
+          const weatherHaze = ctx.createLinearGradient(0, horizonY - 45, 0, h);
+          weatherHaze.addColorStop(0, 'rgba(190, 204, 207, ' + (this.scopeHazeAlpha * 0.42) + ')');
+          weatherHaze.addColorStop(0.48, 'rgba(190, 204, 207, ' + this.scopeHazeAlpha + ')');
+          weatherHaze.addColorStop(1, 'rgba(190, 204, 207, ' + (this.scopeHazeAlpha * 0.28) + ')');
+          ctx.fillStyle = weatherHaze;
+          ctx.fillRect(0, horizonY - 45, w, h - horizonY + 45);
+        }
+
+        const glowX = w * (0.70 + Math.sin((this.scopeBearing * Math.PI) / 180) * 0.08);
+        const glowY = horizonY - 30;
+        const glow = ctx.createRadialGradient(glowX, glowY, 2, glowX, glowY, 90);
+        glow.addColorStop(0, thermal ? 'rgba(230, 235, 231, 0.18)' :
+          (daylight > 0.3 ? 'rgba(245, 224, 177, 0.28)' : 'rgba(170, 198, 215, 0.18)'));
+        glow.addColorStop(1, 'rgba(220, 230, 235, 0)');
+        ctx.fillStyle = glow;
+        ctx.fillRect(glowX - 90, glowY - 90, 180, 180);
+
+        const reflection = ctx.createLinearGradient(glowX - 30, horizonY, glowX + 30, h);
+        reflection.addColorStop(0, thermal ? 'rgba(220, 230, 226, 0.16)' : 'rgba(226, 221, 196, 0.18)');
+        reflection.addColorStop(1, 'rgba(220, 230, 226, 0)');
+        ctx.fillStyle = reflection;
+        ctx.fillRect(glowX - 30, horizonY, 60, h - horizonY);
+
+        // Surface contacts in the optical field of view.
+        const visibleContacts = [];
+        for (const contact of world.contacts) {
+          if (contact.sunk || contact.depthM > 5) continue;
+          const bearing = window.Bathymetry.bearingDeg(sub.lat, sub.lon, contact.lat, contact.lon);
+          const rangeNm = window.Bathymetry.distanceNm(sub.lat, sub.lon, contact.lat, contact.lon);
+          if (rangeNm > 12.0) continue;
+
+          const relativeBearing = ((bearing - this.scopeBearing + 540) % 360) - 180;
+          if (Math.abs(relativeBearing) > fovDeg / 2) continue;
+
+          const sx = w / 2 + (relativeBearing / (fovDeg / 2)) * (w / 2);
+          const rangeScale = clamp(0.96 / Math.sqrt(Math.max(0.3, rangeNm)) * (zoom / 1.5), 0.12, 1.45);
+          const aspect = 0.28 + 0.72 * Math.abs(Math.cos(((contact.heading - bearing) * Math.PI) / 180));
+          const shipLength = 78 * rangeScale;
+          const shipWidth = Math.max(10, shipLength * aspect);
+          const shipHeight = Math.max(5, shipLength * 0.20);
+          const shipY = horizonY - shipHeight * 0.74 + Math.min(5, rangeNm) * 0.7;
+          const left = sx - shipWidth / 2;
+          const right = sx + shipWidth / 2;
+          const hullColor = thermal ? '#e7ece8' : (daylight > 0.25 ? '#263b46' : '#111f2b');
+          const detailColor = thermal ? '#f7f8f3' : (daylight > 0.25 ? '#354d5a' : '#263e4c');
+          const contactVisibility = clamp(1 - (rangeNm / this.scopeVisibilityKm) * 0.74, 0.18, 1);
+          ctx.globalAlpha = contactVisibility;
+
+          ctx.fillStyle = hullColor;
+          ctx.beginPath();
+          ctx.moveTo(left, shipY);
+          ctx.lineTo(left + shipWidth * 0.13, shipY + shipHeight * 0.66);
+          ctx.lineTo(right - shipWidth * 0.10, shipY + shipHeight * 0.66);
+          ctx.lineTo(right, shipY + shipHeight * 0.22);
+          ctx.lineTo(right - shipWidth * 0.03, shipY + shipHeight * 0.08);
+          ctx.closePath();
+          ctx.fill();
+
+          const bridgeX = left + shipWidth * 0.34;
+          ctx.fillStyle = detailColor;
+          ctx.fillRect(bridgeX, shipY - shipHeight * 0.58, shipWidth * 0.26, shipHeight * 0.60);
+          ctx.fillRect(bridgeX + shipWidth * 0.05, shipY - shipHeight * 0.76, shipWidth * 0.13, shipHeight * 0.20);
+          ctx.strokeStyle = thermal ? 'rgba(255,255,255,0.9)' : 'rgba(213, 229, 232, 0.75)';
+          ctx.lineWidth = Math.max(0.65, rangeScale * 0.8);
+          ctx.beginPath();
+          ctx.moveTo(bridgeX + shipWidth * 0.13, shipY - shipHeight * 0.76);
+          ctx.lineTo(bridgeX + shipWidth * 0.13, shipY - shipHeight * 1.12);
+          ctx.stroke();
+
+          ctx.strokeStyle = thermal ? 'rgba(242,245,239,0.75)' : 'rgba(215, 231, 230, 0.58)';
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(left - shipWidth * 0.16, shipY + shipHeight * 0.86);
+          ctx.quadraticCurveTo(sx, shipY + shipHeight * 1.18, right + shipWidth * 0.18, shipY + shipHeight * 0.76);
+          ctx.stroke();
+
+          visibleContacts.push({ contact, sx, shipY, shipHeight, rangeNm, bearing });
+          ctx.globalAlpha = 1;
+        }
+
+        visibleContacts.forEach(({ contact, sx, shipY, shipHeight, rangeNm }) => {
+          const label = `${contact.designation}  /  ${rangeNm.toFixed(1)} NM`;
+          ctx.font = '700 9px Arial, Helvetica, sans-serif';
+          const labelWidth = Math.min(150, ctx.measureText(label).width + 12);
+          const lx = clamp(sx - labelWidth / 2, 12, w - labelWidth - 12);
+          const ly = clamp(shipY - shipHeight * 1.12 - 17, 58, horizonY - 12);
+          drawPanel(lx, ly, labelWidth, 17, 'rgba(7, 20, 31, 0.80)');
+          drawText(label, lx + 6, ly + 8.5, 9, thermal ? '#f3f4ed' : '#d6e3e8', 700);
+          ctx.strokeStyle = thermal ? 'rgba(236, 242, 235, 0.55)' : 'rgba(154, 211, 223, 0.62)';
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.moveTo(sx, ly + 17);
+          ctx.lineTo(sx, shipY - 2);
+          ctx.stroke();
+        });
+        ctx.globalAlpha = 1;
+
+        const vignette = ctx.createRadialGradient(w / 2, h / 2, h * 0.18, w / 2, h / 2, Math.max(w, h) * 0.72);
+        vignette.addColorStop(0, 'rgba(0, 0, 0, 0)');
+        vignette.addColorStop(1, 'rgba(3, 10, 17, 0.48)');
+        ctx.fillStyle = vignette;
+        ctx.fillRect(0, 0, w, h);
+
+        const glass = ctx.createLinearGradient(0, 0, w, h * 0.5);
+        glass.addColorStop(0, 'rgba(210, 235, 245, 0.045)');
+        glass.addColorStop(0.32, 'rgba(210, 235, 245, 0.0)');
+        glass.addColorStop(1, 'rgba(210, 235, 245, 0.018)');
+        ctx.fillStyle = glass;
+        ctx.fillRect(0, 0, w, h);
+
+        // Top instrument bar and azimuth tape.
+        drawPanel(0, 0, w, 30, 'rgba(5, 15, 24, 0.90)');
+        drawText(thermal ? 'FLIR  /  WHITE HOT' : 'EO  /  DAY-NIGHT CHANNEL', 14, 15, 10,
+          thermal ? '#e6e9e2' : '#b8d0df', 700);
+        drawText(`MAG ${zoom.toFixed(1)}×`, w * 0.5, 15, 10, '#e4c58f', 700, 'center');
+        drawText(`AN/BVS-1     ${clock}`, w - 14, 15, 9, '#a8becc', 600, 'right');
+
+        drawPanel(0, 30, w, 27, 'rgba(8, 20, 30, 0.70)');
+        const tapeY = 44;
+        const halfTicks = 6;
+        for (let tick = -halfTicks; tick <= halfTicks; tick++) {
+          const x = w / 2 + (tick / halfTicks) * (w * 0.40);
+          const major = tick % 2 === 0;
+          ctx.strokeStyle = major ? 'rgba(191, 213, 224, 0.82)' : 'rgba(160, 190, 205, 0.48)';
+          ctx.lineWidth = major ? 1.1 : 0.7;
+          ctx.beginPath();
+          ctx.moveTo(x, tapeY - (major ? 8 : 4));
+          ctx.lineTo(x, tapeY + 5);
+          ctx.stroke();
+          if (major) {
+            const tickBearing = Math.round((this.scopeBearing + tick * (fovDeg / 12) + 360) % 360);
+            drawText(String(tickBearing).padStart(3, '0'), x, 36, 8, '#b4c8d4', 600, 'center');
+          }
+        }
+        ctx.strokeStyle = '#e3bd77';
+        ctx.lineWidth = 1.5;
         ctx.beginPath();
-        ctx.moveTo(0, h / 2);
-        ctx.lineTo(w, h / 2);
-        ctx.moveTo(w / 2, 0);
-        ctx.lineTo(w / 2, h);
+        ctx.moveTo(w / 2, 31); ctx.lineTo(w / 2, 55);
         ctx.stroke();
 
-        // Circular scope mask
-        ctx.strokeStyle = '#00ff66';
+        // Center aiming reticle: open brackets, small center marks, no full-screen cross.
+        const cx = w / 2;
+        const cy = h * 0.54;
+        const reticleColor = thermal ? 'rgba(244, 246, 238, 0.78)' : 'rgba(211, 229, 236, 0.80)';
+        ctx.strokeStyle = reticleColor;
+        ctx.lineWidth = 1;
+        const rx = 19;
+        const ry = 15;
+        const gap = 5;
         ctx.beginPath();
-        ctx.arc(w / 2, h / 2, Math.min(w, h) * 0.46, 0, Math.PI * 2);
+        ctx.moveTo(cx - rx, cy - ry + gap); ctx.lineTo(cx - rx, cy - ry); ctx.lineTo(cx - rx + gap, cy - ry);
+        ctx.moveTo(cx + rx - gap, cy - ry); ctx.lineTo(cx + rx, cy - ry); ctx.lineTo(cx + rx, cy - ry + gap);
+        ctx.moveTo(cx - rx, cy + ry - gap); ctx.lineTo(cx - rx, cy + ry); ctx.lineTo(cx - rx + gap, cy + ry);
+        ctx.moveTo(cx + rx - gap, cy + ry); ctx.lineTo(cx + rx, cy + ry); ctx.lineTo(cx + rx, cy + ry - gap);
+        ctx.moveTo(cx - 4, cy); ctx.lineTo(cx + 4, cy);
+        ctx.moveTo(cx, cy - 4); ctx.lineTo(cx, cy + 4);
         ctx.stroke();
+        ctx.fillStyle = '#e8d2a0';
+        ctx.beginPath(); ctx.arc(cx, cy, 1.7, 0, Math.PI * 2); ctx.fill();
+
+        ctx.strokeStyle = 'rgba(195, 216, 225, 0.55)';
+        ctx.lineWidth = 0.8;
+        for (let i = 0; i <= 5; i++) {
+          const y = 72 + i * ((h - 124) / 5);
+          ctx.beginPath();
+          ctx.moveTo(12, y); ctx.lineTo(i % 2 === 0 ? 25 : 19, y);
+          ctx.stroke();
+        }
+        drawText('RNG', 13, 66, 7, '#9bb4c3', 700);
+        drawText('STAB', w - 13, h - 48, 8, '#9bb4c3', 700, 'right');
+        drawText('ON', w - 13, h - 36, 8, '#9bd4be', 700, 'right');
+
+        drawPanel(0, h - 29, w, 29, 'rgba(5, 15, 24, 0.92)');
+        drawText('MAST  EXTENDED', 14, h - 14, 9, '#a9d4c9', 700);
+        drawText(`DEPTH ${sub.depthM.toFixed(1)} m`, w * 0.36, h - 14, 9, '#c5d4dc', 600, 'center');
+        drawText(`OWN HDG ${String(Math.round(sub.heading || 0)).padStart(3, '0')}°`, w * 0.64, h - 14, 9, '#c5d4dc', 600, 'center');
+        drawText(this.scopeWeatherModes[this.scopeWeatherIndex].name + ' / ' + this.scopeVisibilityKm + ' KM',
+          w * 0.83, h - 14, 8, '#a9bfcb', 600, 'center');
+        drawText(thermal ? 'IR SENSOR' : 'OPTICAL SENSOR', w - 14, h - 14, 9, '#e4c58f', 700, 'right');
+        drawCornerFrame('rgba(201, 220, 231, 0.52)');
       }
     }
 
