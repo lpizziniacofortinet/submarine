@@ -14,6 +14,7 @@
   var OBSERVER_HEIGHT_M = 4.5;
   var AZIMUTH_STEP_DEG = 5;
   var RANGES_KM = [1, 2, 3.5, 5.5, 8, 12, 18, 26, 38, 55, 80, 115, 145];
+  var LANDMASK_RANGES_KM = [0.5, 0.8, 1.2, 1.7, 2.4, 3.3, 4.5, 6, 8, 12, 18, 26, 38, 55, 80, 115, 145];
   var BATCH_SIZE = 100;
   var CONCURRENCY = 3;
 
@@ -64,6 +65,103 @@
       var radius = this.effectiveEarthRadius(refractionCoefficient);
       var curvatureDropM = (distanceM * distanceM) / (2 * radius);
       return Math.atan2(elevationM - height - curvatureDropM, distanceM) * 180 / Math.PI;
+    }
+
+    static pointInRing(lon, lat, ring) {
+      var inside = false;
+      for (var i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+        var a = ring[i];
+        var b = ring[j];
+        var crosses = ((a[1] > lat) !== (b[1] > lat)) &&
+          (lon < ((b[0] - a[0]) * (lat - a[1])) / (b[1] - a[1]) + a[0]);
+        if (crosses) inside = !inside;
+      }
+      return inside;
+    }
+
+    static isLand(lat, lon) {
+      var polygons = root.MEDITERRANEAN_LANDMASK;
+      if (!Array.isArray(polygons)) return false;
+      for (var p = 0; p < polygons.length; p++) {
+        var rings = polygons[p];
+        if (!rings || !rings.length || !CoastlineModel.pointInRing(lon, lat, rings[0])) continue;
+        var inHole = false;
+        for (var h = 1; h < rings.length; h++) {
+          if (CoastlineModel.pointInRing(lon, lat, rings[h])) {
+            inHole = true;
+            break;
+          }
+        }
+        if (!inHole) return true;
+      }
+      return false;
+    }
+
+    static distanceKm(lat1, lon1, lat2, lon2) {
+      var toRad = Math.PI / 180;
+      var phi1 = lat1 * toRad;
+      var phi2 = lat2 * toRad;
+      var dPhi = (lat2 - lat1) * toRad;
+      var dLambda = (lon2 - lon1) * toRad;
+      var a = Math.sin(dPhi / 2) ** 2 +
+        Math.cos(phi1) * Math.cos(phi2) * Math.sin(dLambda / 2) ** 2;
+      return 2 * EARTH_RADIUS_M * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)) / 1000;
+    }
+
+    static estimateFallbackElevation(lat, lon) {
+      var elevation = 90;
+      var features = root.Bathymetry && Array.isArray(root.Bathymetry.features)
+        ? root.Bathymetry.features : [];
+      for (var i = 0; i < features.length; i++) {
+        var feature = features[i];
+        if (!Number.isFinite(feature.peakM) || feature.peakM <= 0) continue;
+        var distanceNm = CoastlineModel.distanceKm(lat, lon, feature.lat, feature.lon) / 1.852;
+        var sigmaNm = Math.max(4, feature.radiusNm * 0.72);
+        if (distanceNm > feature.radiusNm * 2.2) continue;
+        var weight = Math.exp(-(distanceNm * distanceNm) / (2 * sigmaNm * sigmaNm));
+        elevation = Math.max(elevation, 90 + (feature.peakM - 90) * weight);
+      }
+      return elevation;
+    }
+
+    static buildFallbackProfile(lat, lon) {
+      var bearings = Array.from({ length: 360 / AZIMUTH_STEP_DEG }, function (_, i) {
+        return i * AZIMUTH_STEP_DEG;
+      });
+      var rays = bearings.map(function (bearing) {
+        var best = {
+          bearing: bearing,
+          angleDeg: CoastlineModel.horizonDipDegrees(),
+          rangeKm: 0,
+          elevationM: 0,
+          hasLand: false
+        };
+        for (var i = 0; i < LANDMASK_RANGES_KM.length; i++) {
+          var rangeKm = LANDMASK_RANGES_KM[i];
+          var point = CoastlineModel.destinationPoint(lat, lon, bearing, rangeKm);
+          if (!CoastlineModel.isLand(point.lat, point.lon)) continue;
+          var elevationM = CoastlineModel.estimateFallbackElevation(point.lat, point.lon);
+          var angleDeg = CoastlineModel.apparentElevationAngle(elevationM, rangeKm);
+          if (angleDeg > best.angleDeg) {
+            best = {
+              bearing: bearing,
+              angleDeg: angleDeg,
+              rangeKm: rangeKm,
+              elevationM: elevationM,
+              hasLand: true
+            };
+          }
+        }
+        return best;
+      });
+      return {
+        azimuthStepDeg: AZIMUTH_STEP_DEG,
+        seaHorizonAngleDeg: CoastlineModel.horizonDipDegrees(),
+        rays: rays,
+        source: root.MEDITERRANEAN_LANDMASK_SOURCE || 'Natural Earth local land mask',
+        fallback: true,
+        sampledAt: Date.now()
+      };
     }
 
     static buildRay(elevations, distancesKm, bearingDeg) {
@@ -125,7 +223,10 @@
       if (key === this.requestedKey || key === this.loadingKey) return;
 
       this.requestedKey = key;
-      this.profile = null;
+      // Draw a local Mediterranean land silhouette immediately. Copernicus DEM
+      // will replace this approximate profile once the online terrain batches arrive.
+      this.profile = CoastlineModel.buildFallbackProfile(lat, lon);
+      this.status = this.profile ? 'FALLBACK' : 'IDLE';
       this.error = null;
 
       var cacheKey = CACHE_PREFIX + key;
@@ -146,7 +247,7 @@
       }
 
       this.loadingKey = key;
-      this.status = 'LOADING';
+      this.status = this.profile ? 'LOADING' : 'OFFLINE';
       this.loadProfile(lat, lon, key).catch((error) => {
         if (this.requestedKey === key) {
           this.error = error;
