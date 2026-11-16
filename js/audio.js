@@ -22,6 +22,7 @@ class SubAudioEngine {
     this.hydrophoneEnabled = true;
     this.volume = 0.75;
     this.initialized = false;
+    this.alarmNodes = [];
 
     // Continuous nodes
     this.ambientGain = null;
@@ -601,6 +602,30 @@ class SubAudioEngine {
   }
 
   /**
+   * Immediately silence active alarm klaxon oscillators without muting
+   * other simulator audio (hydrophone, torpedo screw, reactor, etc.).
+   */
+  stopAlarm(type = 'TORPEDO') {
+    if (!this.ctx || !this.alarmNodes.length) return;
+    const now = this.ctx.currentTime;
+    const remaining = [];
+    for (const alarm of this.alarmNodes) {
+      if (alarm.type !== type) {
+        remaining.push(alarm);
+        continue;
+      }
+      try {
+        alarm.gain.gain.cancelScheduledValues(now);
+        alarm.gain.gain.setTargetAtTime(0, now, 0.015);
+        alarm.osc.stop(now + 0.06);
+      } catch (e) {
+        // Oscillator may already have completed.
+      }
+    }
+    this.alarmNodes = remaining;
+  }
+
+  /**
    * Alarm Klaxon (Torpedo Warning / Reactor Scram / Emergency Blow)
    */
   playAlarm(type = 'TORPEDO') {
@@ -621,6 +646,10 @@ class SubAudioEngine {
         gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.32);
         osc.connect(gain);
         gain.connect(this.masterGain);
+        this.alarmNodes.push({ type, osc, gain });
+        osc.onended = () => {
+          this.alarmNodes = this.alarmNodes.filter((node) => node.osc !== osc);
+        };
         osc.start(now + offset);
         osc.stop(now + offset + 0.34);
       });
@@ -636,6 +665,10 @@ class SubAudioEngine {
         gain.gain.exponentialRampToValueAtTime(0.001, now + offset + 0.25);
         osc.connect(gain);
         gain.connect(this.masterGain);
+        this.alarmNodes.push({ type, osc, gain });
+        osc.onended = () => {
+          this.alarmNodes = this.alarmNodes.filter((node) => node.osc !== osc);
+        };
         osc.start(now + offset);
         osc.stop(now + offset + 0.26);
       });
