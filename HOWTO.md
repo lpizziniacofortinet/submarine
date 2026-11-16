@@ -288,7 +288,7 @@ The launcher applies a small local-only patch to the upstream server so it binds
 
 Open **OPTIONS** from the command bar:
 - **CREW VOICE COMMUNICATIONS** enables/disables spoken callouts. The setting is saved in the current browser.
-- **CREW VOICE PROFILE** selects the neural voice. Available profiles are Michael, Fenrir, and Onyx (American male), plus Bella and Sarah (American female).
+- **CREW VOICE PROFILE** selects the neural voice. The bundled profiles are Fenrir (American male) and Bella (American female).
 - **VOICE TEST** generates and plays a radio check through the local Kokoro model.
 
 The selected voice profile is saved in the browser. The model currently uses American English. Keep the TTS terminal open while using VOX; if the service is stopped, the simulator keeps all text messages visible and reports the local TTS connection error in OPTIONS.
