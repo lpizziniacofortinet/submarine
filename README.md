@@ -6,6 +6,10 @@ The project is built with HTML5, CSS, Canvas, and vanilla JavaScript. It has no 
 
 > **New to the simulator?** Start with the [Captain's Tactical & Engineering Guide](./HOWTO.md).
 
+## Audio assets & licensing
+
+- **Submarine sonar ping:** Spiceman — Sonar Ping, released under **CC0**. The simulator streams the MP3 directly from OpenGameArt (https://opengameart.org/sites/default/files/sonar_ping_0.mp3) and keeps a procedural Web Audio fallback if the remote asset cannot be reached. The audio therefore requires an internet connection on first playback; the source page states that no credit is required, but it is documented here for provenance.
+
 ## Features
 
 ### Mediterranean operations
