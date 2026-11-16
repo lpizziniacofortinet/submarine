@@ -14,7 +14,7 @@ The project is built with HTML5, CSS, Canvas, and vanilla JavaScript. It has no 
 - Simulated commercial shipping, hostile and friendly contacts, and marine-life encounters.
 
 ### Submarine operations
-- Six operator stations: tactical plot, sonar, weapons, maneuvering, reactor, and periscope/ESM.
+- Seven operator stations: tactical plot, sonar, weapons, maneuvering, reactor, and periscope/ESM.
 - Helm orders, depth control, hydroplanes, rudder, ballast, trim, and emergency surfacing.
 - A simplified S9G-inspired reactor and propulsion model with control rods, coolant-pump modes, battery, diesel generator, and SCRAM protection.
 - Torpedo tubes, VLS launch controls, wire-guidance gameplay, and acoustic decoys.
@@ -90,7 +90,8 @@ submarine/
 ├── css/
 │   └── style.css               # CRT-inspired interface styling
 ├── tests/
-│   └── simulation-clock.test.js
+│   ├── simulation-clock.test.js
+│   └── damage-control.test.js
 └── js/
     ├── simulation-clock.js     # Fixed-step simulation clock
     ├── audio.js                # Procedural Web Audio effects
