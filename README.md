@@ -74,7 +74,7 @@ An internet connection is required for third-party map tiles and the optional on
 
 ## Tests
 
-The project includes Node.js unit tests for the fixed-step simulation clock and compartment damage-control model. From the project directory, run:
+The project includes Node.js unit tests for the fixed-step simulation clock, compartment damage-control model, and crew voice dispatch routing. From the project directory, run:
 
 ```bash
 node --test tests/*.test.js
