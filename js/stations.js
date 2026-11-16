@@ -1180,7 +1180,7 @@ class StationRenderers {
         // optical refraction correction; the 2D renderer only projects the skyline.
         if (terrainProfile && terrainProfile.rays && terrainProfile.rays.length) {
           const seaHorizon = terrainProfile.seaHorizonAngleDeg;
-          const verticalScale = 24;
+          const verticalScale = 36;
           const sampleCount = Math.max(100, Math.ceil(w / 4));
           const skyline = [];
           for (let i = 0; i <= sampleCount; i++) {
@@ -1199,8 +1199,8 @@ class StationRenderers {
             if (!a.hasLand && !b.hasLand) continue;
             const rangeKm = (a.rangeKm + b.rangeKm) * 0.5;
             const haze = clamp(1 - Math.max(0, rangeKm - 8) / (this.scopeVisibilityKm * 1.35), 0.18, 0.88);
-            const base = thermal ? [35, 48, 54] : [29, 48, 59];
-            const fog = thermal ? [150, 163, 164] : [127, 151, 159];
+            const base = thermal ? [45, 62, 68] : [43, 64, 76];
+            const fog = thermal ? [160, 174, 176] : [143, 164, 175];
             const mix = clamp(1 - haze, 0, 1);
             const color = base.map((value, channel) => Math.round(value * haze + fog[channel] * mix));
             ctx.fillStyle = 'rgba(' + color.join(',') + ',0.96)';
