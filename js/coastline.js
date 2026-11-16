@@ -164,6 +164,34 @@
       };
     }
 
+    static mergeProfiles(primary, fallback) {
+      if (!primary || !Array.isArray(primary.rays)) return fallback || null;
+      if (!fallback || !Array.isArray(fallback.rays)) {
+        return { ...primary, fallback: false, hybrid: false };
+      }
+
+      var usedFallback = false;
+      var rays = primary.rays.map(function (ray, index) {
+        if (ray && ray.hasLand) return ray;
+        var fallbackRay = fallback.rays[index];
+        if (fallbackRay && fallbackRay.hasLand) {
+          usedFallback = true;
+          return fallbackRay;
+        }
+        return ray || fallbackRay || null;
+      });
+
+      return {
+        ...primary,
+        rays: rays,
+        fallback: false,
+        hybrid: usedFallback,
+        source: usedFallback
+          ? String(primary.source || 'Copernicus DEM') + ' + Natural Earth local land mask'
+          : primary.source
+      };
+    }
+
     static buildRay(elevations, distancesKm, bearingDeg) {
       var ranges = distancesKm || RANGES_KM;
       var bearing = ((bearingDeg || 0) % 360 + 360) % 360;
@@ -236,7 +264,7 @@
           var cached = JSON.parse(cachedRaw);
           if (cached && Date.now() - cached.savedAt < CACHE_TTL_MS &&
               Array.isArray(cached.profile && cached.profile.rays) && cached.profile.rays.length === 72) {
-            this.profile = cached.profile;
+            this.profile = CoastlineModel.mergeProfiles(cached.profile, this.profile);
             this.status = 'CACHED';
             return;
           }
@@ -314,13 +342,14 @@
         return CoastlineModel.buildRay(values, RANGES_KM, bearing);
       });
 
-      var profile = {
+      var profile = CoastlineModel.mergeProfiles({
         azimuthStepDeg: AZIMUTH_STEP_DEG,
         seaHorizonAngleDeg: CoastlineModel.horizonDipDegrees(),
         rays: rays,
         source: 'Copernicus DEM GLO-90 via Open-Meteo',
         sampledAt: Date.now()
-      };
+      }, this.requestedKey === key ? this.profile : null);
+      profile.sampledAt = Date.now();
 
       // Cache completed lookups even when the submarine has moved on, but
       // never let an older asynchronous request replace the current position.
