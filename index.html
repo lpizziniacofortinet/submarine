@@ -572,25 +572,36 @@
              STATION 6: PHOTONICS PERISCOPE, BPS-16 RADAR & AN/BLQ-10 ESM
              ================================================================ -->
         <section id="screen-periscope" class="station-screen">
-          <!-- Left: Optical / Thermal FLIR Photonics Mast View -->
-          <div class="crt-panel">
-            <div class="panel-header">
-              <span>AN/BVS-1 PHOTONICS MAST (PERISCOPE DEPTH &le; 20m REQUIRED)</span>
-              <div style="display:flex; gap:4px;">
-                <button class="mil-btn" id="btn-scope-raise">RAISE SCOPE</button>
-                <button class="mil-btn" id="btn-scope-ir">FLIR THERMAL</button>
-                <button class="mil-btn" id="btn-scope-zoom">MAG: 1.5X</button>
+          <!-- Left: late-90s / early-2000s electro-optical periscope console -->
+          <div class="crt-panel scope-console">
+            <div class="panel-header scope-panel-header">
+              <div class="scope-heading">
+                <span class="scope-kicker">PHOTONICS / EO-IR SENSOR SUITE</span>
+                <strong>AN/BVS-1 // PERISCOPE DISPLAY</strong>
+              </div>
+              <div class="scope-toolbar">
+                <button class="mil-btn scope-control" id="btn-scope-raise">RAISE MAST</button>
+                <button class="mil-btn scope-control" id="btn-scope-ir">FLIR: OFF</button>
+                <button class="mil-btn scope-control" id="btn-scope-zoom">ZOOM 1.5×</button>
               </div>
             </div>
-            <div style="flex:1; position:relative; min-height:0;">
-              <canvas id="periscope-canvas" style="width:100%; height:100%; display:block; background:#020604;"></canvas>
+            <div class="scope-viewport">
+              <canvas id="periscope-canvas" class="scope-display" aria-label="AN/BVS-1 electro-optical periscope image"></canvas>
+              <div class="scope-live-mark"><span></span> EO SENSOR</div>
             </div>
-            <div style="display:flex; justify-content:space-between; align-items:center; padding-top:4px;">
-              <span>SLEW BEARING: <strong id="scope-brg-val" style="color:var(--crt-amber)">000° TRUE</strong></span>
-              <div style="display:flex; gap:4px;">
-                <button class="mil-btn" id="btn-scope-left">&lt;&lt; SLEW L</button>
-                <button class="mil-btn" id="btn-scope-lock-tgt">LOCK SELECTED TARGET</button>
-                <button class="mil-btn" id="btn-scope-right">SLEW R &gt;&gt;</button>
+            <div class="scope-control-row">
+              <div class="scope-bearing-readout">
+                <span>TRUE BEARING</span>
+                <strong id="scope-brg-val">090° T</strong>
+              </div>
+              <div class="scope-slew-controls">
+                <button class="mil-btn scope-control" id="btn-scope-left">◀ 10°</button>
+                <button class="mil-btn scope-control scope-lock" id="btn-scope-lock-tgt">DESIGNATE CONTACT</button>
+                <button class="mil-btn scope-control" id="btn-scope-right">10° ▶</button>
+              </div>
+              <div class="scope-system-readout">
+                <span>MAST CONTROL</span>
+                <strong>EO / STABILIZED</strong>
               </div>
             </div>
           </div>
