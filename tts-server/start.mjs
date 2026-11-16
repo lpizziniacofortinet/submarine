@@ -69,7 +69,7 @@ try {
     packageJson.scripts = packageJson.scripts || {};
     packageJson.scripts.postinstall =
       "node -e \"require('node:fs').mkdirSync('node_modules/@huggingface/transformers/.cache',{recursive:true})\"";
-    writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\\n', 'utf8');
+    writeFileSync(packagePath, JSON.stringify(packageJson, null, 2) + '\n', 'utf8');
     run('npm', ['install', '--omit=dev'], installDir);
   }
 
