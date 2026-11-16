@@ -84,7 +84,7 @@ node tts-server/start.mjs
 
 The bootstrapper clones HeadTTS into `~/.submarine-headtts`, installs its dependencies once, and starts the REST service on `127.0.0.1:8882`. The model and voice assets are downloaded/cached on first use. Keep this terminal open while playing; press **Ctrl+C** to stop the service.
 
-In the simulator, open **OPTIONS**, enable **CREW VOICE COMMUNICATIONS**, choose a **CREW VOICE PROFILE**, then press **VOICE TEST**. The available profiles are American English voices from Kokoro. The first synthesis may take longer while model assets are prepared.
+In the simulator, open **OPTIONS**, enable **CREW VOICE COMMUNICATIONS**, choose a **CREW VOICE PROFILE**, then press **VOICE TEST**. The bundled profiles are Fenrir (American male) and Bella (American female). The first synthesis may take longer while model assets are prepared.
 
 The bootstrapper restricts the upstream listener to loopback rather than exposing the unauthenticated TTS service to the LAN. If the upstream server source changes and the safe loopback patch no longer matches, startup stops instead of binding an unverified listener. Voice generation itself runs locally; there is no hosted TTS endpoint or API key.
 
@@ -110,11 +110,15 @@ submarine/
 ├── tts-server/
 │   ├── headtts-node.json       # Local Kokoro REST server configuration
 │   └── start.mjs               # Installs and starts the separate local TTS process
+├── tts-server/
+│   ├── headtts-node.json       # Local Kokoro REST server configuration
+│   └── start.mjs               # Installs and starts the separate local TTS process
 ├── tests/
 │   ├── simulation-clock.test.js
 │   ├── damage-control.test.js
 │   └── voice-callouts.test.js
 └── js/
+    ├── local-tts.js            # Local Kokoro client and radio audio chain
     ├── local-tts.js            # Local Kokoro client and radio audio chain
     ├── simulation-clock.js     # Fixed-step simulation clock
     ├── audio.js                # Procedural Web Audio effects
