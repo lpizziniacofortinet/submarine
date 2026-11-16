@@ -4,6 +4,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 
 const spokenUtterances = [];
+const storedSettings = new Map();
 const mockSpeechSynthesis = {
   paused: false,
   getVoices() { return []; },
@@ -16,8 +17,8 @@ const mockSpeechSynthesis = {
 global.window = {
   addEventListener() {},
   localStorage: {
-    getItem() { return null; },
-    setItem() {}
+    getItem(key) { return storedSettings.get(key) ?? null; },
+    setItem(key, value) { storedSettings.set(key, String(value)); }
   },
   speechSynthesis: mockSpeechSynthesis,
   SpeechSynthesisUtterance: class SpeechSynthesisUtterance {
@@ -73,4 +74,12 @@ test('voice selection falls back to an installed system voice when no English vo
   ];
   window.SubAudio.refreshVoices();
   assert.equal(window.SubAudio.preferredVoice.name, 'French Default');
+});
+
+
+test('voice preference persists when disabled from simulator options', () => {
+  assert.equal(window.SubAudio.setVoiceEnabled(false), false);
+  assert.equal(storedSettings.get('ssn774_voice_enabled'), 'false');
+  assert.equal(window.SubAudio.setVoiceEnabled(true), true);
+  assert.equal(storedSettings.get('ssn774_voice_enabled'), 'true');
 });
