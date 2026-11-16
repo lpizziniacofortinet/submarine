@@ -1294,6 +1294,7 @@ class SubmarineWorld {
       voiceBtn.addEventListener('click', () => {
         const on = window.SubAudio.toggleVoice();
         paintVoiceButton(on);
+        if (on) window.SubAudio.speak('Conn, radio check. How copy?', true);
       });
     }
 
