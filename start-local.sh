@@ -7,6 +7,7 @@
 # Usage:
 #   bash start-local.sh
 #   SIM_PORT=8090 bash start-local.sh
+#   bash start-local.sh --with-voice
 #   bash start-local.sh --no-open
 #
 set -Eeuo pipefail
@@ -18,9 +19,11 @@ SIM_PORT="${SIM_PORT:-8080}"
 TTS_URL="http://127.0.0.1:8882"
 SIM_URL="http://127.0.0.1:${SIM_PORT}"
 NO_OPEN=0
+WITH_VOICE=0
 for arg in "$@"; do
   case "$arg" in
     --no-open) NO_OPEN=1 ;;
+    --with-voice) WITH_VOICE=1 ;;
     -h|--help)
       sed -n '2,12p' "$0"
       exit 0
@@ -73,14 +76,16 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 
-command -v node >/dev/null 2>&1 || fail "Node.js is required. Install Node.js 20 or newer."
-command -v npm >/dev/null 2>&1 || fail "npm is missing. Install the current Node.js LTS distribution."
-command -v git >/dev/null 2>&1 || fail "Git is required for the first-time HeadTTS installation."
 command -v python3 >/dev/null 2>&1 || fail "Python 3 is required to serve the simulator."
 command -v curl >/dev/null 2>&1 || fail "curl is required for local service health checks."
 
-NODE_MAJOR="$(node -p 'Number(process.versions.node.split(".")[0])')"
-[[ "$NODE_MAJOR" -ge 20 ]] || fail "Node.js 20 or newer is required (found $(node -v))."
+if [[ "$WITH_VOICE" -eq 1 ]]; then
+  command -v node >/dev/null 2>&1 || fail "Node.js is required for crew voice. Install Node.js 20 or newer."
+  command -v npm >/dev/null 2>&1 || fail "npm is missing. Install the current Node.js LTS distribution."
+  command -v git >/dev/null 2>&1 || fail "Git is required for the first-time HeadTTS installation."
+  NODE_MAJOR="$(node -p 'Number(process.versions.node.split(".")[0])')"
+  [[ "$NODE_MAJOR" -ge 20 ]] || fail "Node.js 20 or newer is required (found $(node -v))."
+fi
 
 if [[ ! "$SIM_PORT" =~ ^[0-9]+$ ]] || [[ "$SIM_PORT" -lt 1024 ]] || [[ "$SIM_PORT" -gt 65535 ]]; then
   fail "SIM_PORT must be a TCP port between 1024 and 65535."
@@ -94,14 +99,16 @@ tts_ready() {
   [[ "$response" == HeadTTS* ]]
 }
 
-log "Checking local neural voice engine..."
-if tts_ready; then
-  log "HeadTTS is already running at ${TTS_URL}; reusing it."
-else
-  log "Starting HeadTTS + Kokoro. First run downloads the model and may take several minutes."
-  node "$ROOT_DIR/tts-server/start.mjs" >>"$TTS_LOG" 2>&1 &
-  TTS_PID=$!
-  TTS_OWNED=1
+if [[ "$WITH_VOICE" -eq 1 ]]; then
+  log "Checking local neural voice engine..."
+  if tts_ready; then
+    log "HeadTTS is already running at ${TTS_URL}; reusing it."
+  else
+    log "Starting HeadTTS + Kokoro. First run downloads the model and may take several minutes."
+    node "$ROOT_DIR/tts-server/start.mjs" >>"$TTS_LOG" 2>&1 &
+    TTS_PID=$!
+    TTS_OWNED=1
+  fi
 fi
 
 if curl -fsS --max-time 2 "$SIM_URL" -o /dev/null 2>/dev/null; then
@@ -125,23 +132,26 @@ until curl -fsS --max-time 2 "$SIM_URL" -o /dev/null 2>/dev/null; do
   sleep 1
 done
 
-log "Waiting for Kokoro to finish loading..."
-dots=0
-until tts_ready; do
-  if [[ "$TTS_OWNED" -eq 1 ]] && ! kill -0 "$TTS_PID" 2>/dev/null; then
-    tail -n 80 "$TTS_LOG" >&2 || true
-    fail "The local TTS server exited. Review ${TTS_LOG}."
-  fi
-  dots=$((dots + 1))
-  if (( dots % 10 == 0 )); then
-    log "Still loading the local model; details are in ${TTS_LOG}."
-  fi
-  sleep 2
-done
-
-log "Kokoro is ready."
+if [[ "$WITH_VOICE" -eq 1 ]]; then
+  log "Waiting for Kokoro to finish loading..."
+  dots=0
+  until tts_ready; do
+    if [[ "$TTS_OWNED" -eq 1 ]] && ! kill -0 "$TTS_PID" 2>/dev/null; then
+      tail -n 80 "$TTS_LOG" >&2 || true
+      fail "The local TTS server exited. Review ${TTS_LOG}."
+    fi
+    dots=$((dots + 1))
+    if (( dots % 10 == 0 )); then
+      log "Still loading the local model; details are in ${TTS_LOG}."
+    fi
+    sleep 2
+  done
+  log "Kokoro is ready."
+else
+  log "Crew voice is disabled. Use --with-voice to start the optional Kokoro engine."
+fi
 log "Simulator: ${SIM_URL}"
-log "Voice API: ${TTS_URL}"
+if [[ "$WITH_VOICE" -eq 1 ]]; then log "Voice API: ${TTS_URL}"; fi
 log "Logs: ${LOG_DIR}"
 log "Keep this terminal open. Press Ctrl+C to stop the services started by this script."
 
