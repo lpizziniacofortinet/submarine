@@ -30,7 +30,6 @@ class CombatLogger {
     }
 
     this.showPopup(station, message, cssClass, timeStr);
-    if (window.SubAudio) window.SubAudio.announce(station, message, cssClass);
   }
 
   showPopup(station, message, cssClass = 'conn', timeStr = '') {
@@ -84,6 +83,7 @@ class SubmarineWorld {
     this.decoys = [];
     this.selectedContactId = null;
     this.weaponSerial = 1;
+    this.torpedoAlarmAcknowledged = false;
 
     this.currentSeafloorM = 1420;
     this.currentThermoclineM = 88;
@@ -296,6 +296,7 @@ class SubmarineWorld {
     this.weapons = [];
     this.decoys = [];
     this.selectedContactId = null;
+    this.torpedoAlarmAcknowledged = false;
     this.torpedoMagazine = 16;
 
     this.reactor.reset();
@@ -668,7 +669,15 @@ class SubmarineWorld {
    * Enemy Submarine / Frigate fires a Yu-6 or Yu-7 Torpedo at USS Virginia
    */
   fireHostileTorpedo(shooter, bearingToPlayer, estPlayerDepth) {
+    const activeHostileTorpedoes = this.weapons.filter(
+      (weapon) => !weapon.isPlayer && weapon.type === 'TORPEDO' && !weapon.exploded
+    ).length;
+    if (activeHostileTorpedoes >= 2) return false;
+
+    const newThreat = activeHostileTorpedoes === 0;
     const wepName = shooter.profile.category === 'SUBMARINE' ? 'YU-6 HEAVY TORPEDO' : 'YU-7 ASW TORPEDO';
+    const launchBearing = (bearingToPlayer + (Math.random() - 0.5) * 2.4 + 360) % 360;
+    const targetDepthEstimate = Math.max(15, estPlayerDepth + (Math.random() - 0.5) * 12);
     const torp = new window.WeaponEntity({
       id: `HOSTILE-T${this.weaponSerial++}`,
       name: wepName,
@@ -677,9 +686,9 @@ class SubmarineWorld {
       lat: shooter.lat,
       lon: shooter.lon,
       depthM: shooter.depthM <= 5 ? 35 : shooter.depthM,
-      orderedDepthM: Math.max(15, estPlayerDepth),
-      heading: bearingToPlayer,
-      orderedHeading: bearingToPlayer,
+      orderedDepthM: targetDepthEstimate,
+      heading: launchBearing,
+      orderedHeading: launchBearing,
       speedKts: 45,
       enableDistanceYds: 900,
       seekerMode: 'ACTIVE_PASSIVE',
@@ -687,14 +696,16 @@ class SubmarineWorld {
     });
 
     this.weapons.push(torp);
-    if (window.SubAudio) {
-      window.SubAudio.playAlarm('TORPEDO');
+    if (newThreat) {
+      this.torpedoAlarmAcknowledged = false;
+      if (window.SubAudio) window.SubAudio.playAlarm('TORPEDO');
     }
     window.GameLogger.log(
       'SONAR',
-      `CONN, SONAR! TORPEDO IN THE WATER! High-speed screw transient from ${shooter.designation} bearing ${Math.round((bearingToPlayer + 180) % 360).toString().padStart(3, '0')}°!`,
+      `CONN, SONAR! TORPEDO IN THE WATER! Single hostile weapon launched by ${shooter.designation}, bearing ${Math.round((launchBearing + 180) % 360).toString().padStart(3, '0')}°!`,
       'alert'
     );
+    return true;
   }
 
   spawnDecoy(lat, lon, depthM, isPlayer, ownerName) {
@@ -810,9 +821,16 @@ class SubmarineWorld {
     document.getElementById('ann-active-sonar').className =
       'annunciator ' + (this.simTimeSec - this.lastHostilePingTime < 8 ? 'crit-active' : '');
 
-    const hostileTorpInWater = this.weapons.some((w) => !w.isPlayer && !w.exploded);
-    document.getElementById('ann-torpedo').className =
-      'annunciator ' + (hostileTorpInWater ? 'crit-active' : '');
+    const hostileTorpInWater = this.weapons.some(
+      (weapon) => !weapon.isPlayer && weapon.type === 'TORPEDO' && !weapon.exploded
+    );
+    if (!hostileTorpInWater) this.torpedoAlarmAcknowledged = false;
+    const torpedoAnnunciator = document.getElementById('ann-torpedo');
+    torpedoAnnunciator.className = 'annunciator ' + (hostileTorpInWater ? 'crit-active' : '');
+    torpedoAnnunciator.setAttribute('aria-pressed', String(this.torpedoAlarmAcknowledged));
+    torpedoAnnunciator.title = hostileTorpInWater
+      ? (this.torpedoAlarmAcknowledged ? 'Audible klaxon silenced; visual warning remains active' : 'Click to silence the torpedo klaxon')
+      : 'No hostile torpedo currently in the water';
     document.body.classList.toggle('red-alert', hostileTorpInWater);
 
     document.getElementById('ann-depth').className =
@@ -1259,9 +1277,15 @@ class SubmarineWorld {
     // Time Compression & Audio
     const torpedoAnnunciator = document.getElementById('ann-torpedo');
     torpedoAnnunciator.addEventListener('click', () => {
+      const threatActive = this.weapons.some(
+        (weapon) => !weapon.isPlayer && weapon.type === 'TORPEDO' && !weapon.exploded
+      );
+      if (!threatActive || this.torpedoAlarmAcknowledged) return;
+      this.torpedoAlarmAcknowledged = true;
       if (window.SubAudio) window.SubAudio.stopAlarm('TORPEDO');
-      torpedoAnnunciator.title = 'Torpedo warning acknowledged; visual warning remains active';
-      window.GameLogger.log('CONN', 'Torpedo warning audible alarm silenced. Visual annunciator remains active while the threat is present.', 'conn');
+      torpedoAnnunciator.setAttribute('aria-pressed', 'true');
+      torpedoAnnunciator.title = 'Audible klaxon silenced; visual warning remains active';
+      window.GameLogger.log('CONN', 'Torpedo klaxon acknowledged and silenced. Visual warning remains active.', 'conn');
     });
 
     const setTimeRate = (rate) => {
@@ -1272,31 +1296,6 @@ class SubmarineWorld {
     document.getElementById('btn-time-2x').addEventListener('click', () => setTimeRate(2));
     document.getElementById('btn-time-5x').addEventListener('click', () => setTimeRate(5));
     document.getElementById('btn-time-10x').addEventListener('click', () => setTimeRate(10));
-
-    document.getElementById('btn-audio-toggle').addEventListener('click', (e) => {
-      const on = window.SubAudio.toggle();
-      e.target.textContent = on ? 'SND:ON' : 'SND:OFF';
-      e.target.classList.toggle('active', on);
-    });
-
-    const voiceBtn = document.getElementById('btn-voice-toggle');
-    if (voiceBtn) {
-      const voiceAvailable = window.SubAudio.speechSupported;
-      voiceBtn.disabled = !voiceAvailable;
-      const paintVoiceButton = (on) => {
-        voiceBtn.textContent = voiceAvailable ? (on ? 'VOX:ON' : 'VOX:OFF') : 'VOX:N/A';
-        voiceBtn.classList.toggle('active', Boolean(on));
-        voiceBtn.title = voiceAvailable
-          ? 'Toggle local crew voice communications (Web Speech API)'
-          : 'Speech synthesis is not available in this browser';
-      };
-      paintVoiceButton(window.SubAudio.voiceEnabled);
-      voiceBtn.addEventListener('click', () => {
-        const on = window.SubAudio.toggleVoice();
-        paintVoiceButton(on);
-        if (on) window.SubAudio.speak('Conn, radio check. How copy?', true);
-      });
-    }
 
     // Play crisp 90s CRT console beep on any button or tab click
     document.addEventListener('click', (e) => {
@@ -1529,7 +1528,7 @@ class SubmarineWorld {
       this.ownSub.mbtBlowState = 'EMERGENCY';
       this.ownSub.orderedDepthM = 0;
       if (window.SubAudio) {
-        window.SubAudio.playAlarm('TORPEDO');
+        window.SubAudio.playAlarm('BLOW');
         window.SubAudio.playPneumaticHiss(2.5);
       }
       window.GameLogger.log('CONN', 'EMERGENCY MAIN BALLAST TANK BLOW! Dumping 4500 PSI High-Pressure Air to surface!', 'alert');
