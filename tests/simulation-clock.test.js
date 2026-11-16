@@ -39,3 +39,31 @@ test('reset clears accumulated and diagnostic state', () => {
   assert.equal(clock.totalSteps, 0);
   assert.equal(clock.droppedTimeSec, 0);
 });
+
+test('preserves 10x simulation time at 30 FPS without dropping fixed steps', () => {
+  const compression = 10;
+  const clock = new SimulationClock();
+  clock.maxFrameDeltaSec = 0.25 * compression;
+  clock.maxSubSteps = Math.ceil(clock.maxFrameDeltaSec / clock.fixedStepSec);
+
+  let simulatedSeconds = 0;
+  for (let frame = 0; frame < 100; frame++) {
+    clock.advance((1 / 30) * compression, dt => { simulatedSeconds += dt; });
+  }
+
+  assert.ok(Math.abs(simulatedSeconds - (100 / 30) * compression) < 1e-9);
+  assert.equal(clock.droppedTimeSec, 0);
+  assert.ok(clock.totalSteps > 8 * 100);
+});
+
+test('still drops excessive wall-clock stalls after applying compression', () => {
+  const compression = 10;
+  const clock = new SimulationClock();
+  clock.maxFrameDeltaSec = 0.25 * compression;
+  clock.maxSubSteps = Math.ceil(clock.maxFrameDeltaSec / clock.fixedStepSec);
+
+  clock.advance(1 * compression, () => {});
+
+  assert.ok(clock.droppedTimeSec >= 7.49);
+  assert.ok(clock.accumulatorSec < clock.fixedStepSec);
+});
