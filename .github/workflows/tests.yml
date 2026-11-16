@@ -18,3 +18,8 @@ jobs:
           node-version: 20
       - name: Run tests
         run: node --test tests/*.test.js
+      - name: Check local launcher and TTS JavaScript syntax
+        run: |
+          bash -n start-local.sh
+          node --check js/local-tts.js
+          node --check tts-server/start.mjs
