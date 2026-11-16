@@ -337,7 +337,9 @@ class SubmarineWorld {
   }
 
   selectContact(contactId) {
-    this.selectedContactId = contactId;
+    // Clicking the active track again toggles the selection off. Passing null
+    // explicitly clears the current track without changing manual weapon inputs.
+    this.selectedContactId = contactId && this.selectedContactId === contactId ? null : contactId;
     const c = this.getSelectedContact();
     if (c) {
       // Auto-populate Fire Control launch bearing to target's intercept lead
@@ -348,6 +350,7 @@ class SubmarineWorld {
       document.getElementById('scope-brg-val').textContent = `${window.Stations.scopeBearing.toString().padStart(3, '0')}° TRUE`;
     }
     this.updateContactsTableUI();
+    this.updateSonarAndWeaponsReadouts();
   }
 
   computeInterceptHeading(contact) {
@@ -421,12 +424,6 @@ class SubmarineWorld {
     // 5. Step Contacts & TMA
     for (const c of this.contacts) {
       c.update(dt, this.ownSub, this.currentThermoclineM, this);
-    }
-
-    // Auto-select first detected contact if none selected
-    if (!this.selectedContactId) {
-      const firstDet = this.contacts.find((c) => c.detected && !c.sunk);
-      if (firstDet) this.selectContact(firstDet.id);
     }
 
     // 6. Step Active Weapons (Torpedoes & Missiles)
@@ -962,7 +959,13 @@ class SubmarineWorld {
 
   updateSonarAndWeaponsReadouts() {
     const sel = this.getSelectedContact();
-    if (sel && sel.detected && !sel.sunk) {
+    const hasActiveSelection = Boolean(sel && sel.detected && !sel.sunk);
+    const spectrumTarget = document.getElementById('sonar-spectrum-target');
+    if (spectrumTarget) {
+      spectrumTarget.textContent = hasActiveSelection ? `ANALYZING ${sel.id}` : 'NO TRACK SELECTED';
+    }
+
+    if (hasActiveSelection) {
       const prof = sel.classifiedAs ? window.ACOUSTIC_PROFILES[sel.classifiedAs] : null;
       document.getElementById('tma-track-id').textContent = sel.id;
       document.getElementById('tma-desig').textContent = sel.designation;
@@ -990,6 +993,26 @@ class SubmarineWorld {
       const runSec = Math.round((sel.estRangeNm / torpSpd) * 3600);
       document.getElementById('fc-run-time').textContent =
         `${Math.floor(runSec / 60)}m ${(runSec % 60).toString().padStart(2, '0')}s`;
+    } else {
+      // Clear all contact-derived solutions; manual gyro/depth inputs remain untouched.
+      document.getElementById('tma-track-id').textContent = 'NO TRACK';
+      document.getElementById('tma-desig').textContent = '--';
+      document.getElementById('tma-class').textContent = 'UNKNOWN';
+      document.getElementById('tma-brg').textContent = '---° (0.0°/m)';
+      document.getElementById('tma-quality').textContent = '0% (POOR)';
+      document.getElementById('tma-quality-bar').style.width = '0%';
+      document.getElementById('tma-range').textContent = '--.- NM (---- yds)';
+      document.getElementById('tma-crs-spd').textContent = '---° / -- KT';
+      document.getElementById('tma-depth').textContent = '-- m';
+      document.getElementById('tma-snr').textContent = '-- dB';
+
+      document.getElementById('fc-selected-target').textContent = 'TARGET: NONE';
+      document.getElementById('fc-tgt-name').textContent = 'MANUAL BEARING';
+      document.getElementById('fc-tgt-qual').textContent = '--%';
+      document.getElementById('fc-tgt-brg').textContent = '000°';
+      document.getElementById('fc-lead-hdg').textContent = '000°';
+      document.getElementById('fc-tgt-rng').textContent = '--.- NM';
+      document.getElementById('fc-run-time').textContent = '--:--';
     }
 
     // Active weapons list on Tactical screen
@@ -1416,6 +1439,9 @@ class SubmarineWorld {
       }
       if (best) this.selectContact(best.id);
     });
+
+    // Explicit sonar control to clear the currently selected track.
+    document.getElementById('btn-sonar-clear-track').addEventListener('click', () => this.selectContact(null));
 
     // Classification Controls
     document.getElementById('btn-confirm-classify').addEventListener('click', () => {
