@@ -545,7 +545,6 @@ class SubmarineWorld {
     this.ownSub.addAcousticTransient(12);
     if (window.SubAudio) {
       window.SubAudio.playPneumaticHiss(0.8);
-      window.SubAudio.speak(`Flooding Tube ${tubeIndex}.`);
     }
     window.GameLogger.log('WEPS', `Flooding Torpedo Tube ${tubeIndex} and opening outer shutter door...`, 'weps');
     this.renderTubesUI();
@@ -592,7 +591,6 @@ class SubmarineWorld {
     this.ownSub.addAcousticTransient(32);
     if (window.SubAudio) {
       window.SubAudio.playTubeLaunch();
-      window.SubAudio.speak(`Tube ${tubeIndex} fired! Unit running normal, wire guidance online.`);
     }
 
     if (this.torpedoMagazine > 0) {
@@ -655,7 +653,6 @@ class SubmarineWorld {
     this.ownSub.addAcousticTransient(40);
     if (window.SubAudio) {
       window.SubAudio.playMissileLaunch();
-      window.SubAudio.speak(`VLS Tube ${vlsIndex} away! Missile broached and tracking.`);
     }
 
     window.GameLogger.log(
@@ -692,7 +689,6 @@ class SubmarineWorld {
     this.weapons.push(torp);
     if (window.SubAudio) {
       window.SubAudio.playAlarm('TORPEDO');
-      window.SubAudio.speak(`Conn, Sonar! Torpedo in the water! Bearing ${Math.round((bearingToPlayer + 180) % 360)}!`, true);
     }
     window.GameLogger.log(
       'SONAR',
@@ -1298,7 +1294,6 @@ class SubmarineWorld {
       voiceBtn.addEventListener('click', () => {
         const on = window.SubAudio.toggleVoice();
         paintVoiceButton(on);
-        if (on) window.SubAudio.speak('Conn, radio check. How copy?', true);
       });
     }
 
@@ -1535,7 +1530,6 @@ class SubmarineWorld {
       if (window.SubAudio) {
         window.SubAudio.playAlarm('TORPEDO');
         window.SubAudio.playPneumaticHiss(2.5);
-        window.SubAudio.speak('Emergency Main Ballast Tank Blow! Surface, Surface, Surface!', true);
       }
       window.GameLogger.log('CONN', 'EMERGENCY MAIN BALLAST TANK BLOW! Dumping 4500 PSI High-Pressure Air to surface!', 'alert');
     });
