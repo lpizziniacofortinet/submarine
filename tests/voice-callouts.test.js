@@ -3,16 +3,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const spokenUtterances = [];
 const storedSettings = new Map();
-const mockSpeechSynthesis = {
-  paused: false,
-  getVoices() { return []; },
-  addEventListener() {},
-  cancel() {},
-  resume() { this.paused = false; },
-  speak(utterance) { spokenUtterances.push(utterance); }
-};
+const synthRequests = [];
+const voiceStatuses = [];
 
 global.window = {
   addEventListener() {},
@@ -20,66 +13,125 @@ global.window = {
     getItem(key) { return storedSettings.get(key) ?? null; },
     setItem(key, value) { storedSettings.set(key, String(value)); }
   },
-  speechSynthesis: mockSpeechSynthesis,
-  SpeechSynthesisUtterance: class SpeechSynthesisUtterance {
-    constructor(text) { this.text = text; }
-  },
-  setTimeout
+  setTimeout,
+  clearTimeout,
+  atob,
+  speechSynthesis: null
+};
+global.document = { addEventListener() {} };
+
+global.fetch = async (url, options = {}) => {
+  if (url.endsWith('/v1/hello')) {
+    return { ok: true, status: 200, text: async () => 'HeadTTS v0.1.0' };
+  }
+  if (url.endsWith('/v1/synthesize')) {
+    synthRequests.push(JSON.parse(options.body));
+    return {
+      ok: true,
+      status: 200,
+      json: async () => ({ audio: Buffer.from([82, 73, 70, 70]).toString('base64') })
+    };
+  }
+  throw new Error('Unexpected URL: ' + url);
 };
 
 require('../js/audio.js');
-const VoiceEngine = window.SubAudio.constructor;
+require('../js/local-tts.js');
+const engine = window.SubAudio;
+
+function makeNode() {
+  return {
+    value: 0,
+    gain: { value: 0 },
+    frequency: { value: 0 },
+    Q: { value: 0 },
+    threshold: { value: 0 },
+    knee: { value: 0 },
+    ratio: { value: 0 },
+    attack: { value: 0 },
+    release: { value: 0 },
+    connect() {},
+    start() { setImmediate(() => this.onended?.()); },
+    stop() { setImmediate(() => this.onended?.()); }
+  };
+}
+
+engine.init = () => {
+  if (!engine.ctx) {
+    engine.ctx = {
+      state: 'running',
+      destination: {},
+      resume: async () => {},
+      decodeAudioData: async () => ({ duration: 1 }),
+      createBufferSource: makeNode,
+      createBiquadFilter: makeNode,
+      createDynamicsCompressor: makeNode,
+      createGain: makeNode
+    };
+  }
+};
+engine.playRadioSquelch = () => {};
+engine.onVoiceStatus = (state, detail) => voiceStatuses.push({ state, detail });
 
 test('urgent alerts are announced regardless of station', () => {
-  assert.equal(VoiceEngine.shouldAnnounce('ALERT', 'Hull implosion', 'alert'), true);
-  assert.equal(VoiceEngine.shouldAnnounce('WEPS', 'Cannot launch', 'alert'), true);
+  assert.equal(engine.constructor.shouldAnnounce('ALERT', 'Hull implosion', 'alert'), true);
+  assert.equal(engine.constructor.shouldAnnounce('WEPS', 'Cannot launch', 'alert'), true);
 });
 
 test('routine connection log entries stay visual', () => {
-  assert.equal(VoiceEngine.shouldAnnounce('CONN', 'Patrol state saved.', 'conn'), false);
-  assert.equal(VoiceEngine.shouldAnnounce('ENG', 'Main coolant pumps set to SLOW.', 'eng'), false);
+  assert.equal(engine.constructor.shouldAnnounce('CONN', 'Patrol state saved.', 'conn'), false);
+  assert.equal(engine.constructor.shouldAnnounce('ENG', 'Main coolant pumps set to SLOW.', 'eng'), false);
 });
 
 test('important sonar reports are announced', () => {
-  assert.equal(VoiceEngine.shouldAnnounce('SONAR', 'Transmitting 3.5 kHz Active Ping', 'sonar'), true);
-  assert.equal(VoiceEngine.shouldAnnounce('SONAR', 'Contact classified as Akula', 'sonar'), true);
+  assert.equal(engine.constructor.shouldAnnounce('SONAR', 'Transmitting 3.5 kHz Active Ping', 'sonar'), true);
+  assert.equal(engine.constructor.shouldAnnounce('SONAR', 'Contact classified as Akula', 'sonar'), true);
 });
 
 test('significant weapons events are announced but unrelated messages are not', () => {
-  assert.equal(VoiceEngine.shouldAnnounce('WEPS', 'Tube 1 FIRED', 'weps'), true);
-  assert.equal(VoiceEngine.shouldAnnounce('WEPS', 'Flooding Torpedo Tube 2', 'weps'), true);
-  assert.equal(VoiceEngine.shouldAnnounce('WEPS', 'Selected VLS payload', 'weps'), false);
+  assert.equal(engine.constructor.shouldAnnounce('WEPS', 'Tube 1 FIRED', 'weps'), true);
+  assert.equal(engine.constructor.shouldAnnounce('WEPS', 'Flooding Torpedo Tube 2', 'weps'), true);
+  assert.equal(engine.constructor.shouldAnnounce('WEPS', 'Selected VLS payload', 'weps'), false);
 });
 
 test('radio formatting removes duplicate sonar prefix and expands common symbols', () => {
   assert.equal(
-    VoiceEngine.formatRadioMessage('SONAR', 'CONN, SONAR! TORPEDO IN THE WATER! Bearing 123°!'),
+    engine.constructor.formatRadioMessage('SONAR', 'CONN, SONAR! TORPEDO IN THE WATER! Bearing 123°!'),
     'Sonar, Conn. TORPEDO IN THE WATER! Bearing 123 degrees!'
   );
-  assert.match(VoiceEngine.formatRadioMessage('WEPS', 'Tube 1 at <= 45m'), /at or below/);
+  assert.match(engine.constructor.formatRadioMessage('WEPS', 'Tube 1 at <= 45m'), /at or below/);
 });
 
-
-test('voice test sends an utterance synchronously to speechSynthesis', () => {
-  window.SubAudio.playRadioSquelch = () => {};
-  assert.equal(window.SubAudio.testVoice(), true);
-  assert.equal(spokenUtterances.length, 1);
-  assert.match(spokenUtterances[0].text, /USS Virginia/);
-  assert.equal(typeof spokenUtterances[0].onend, 'function');
+test('local neural voice profile is persisted and validated', () => {
+  assert.equal(engine.setVoiceProfile('af_bella'), true);
+  assert.equal(engine.voiceProfile, 'af_bella');
+  assert.equal(storedSettings.get('ssn774_voice_profile'), 'af_bella');
+  assert.equal(engine.setVoiceProfile('not-a-real-voice'), false);
+  assert.equal(engine.voiceProfile, 'af_bella');
 });
-
-test('voice selection falls back to an installed system voice when no English voice exists', () => {
-  mockSpeechSynthesis.getVoices = () => [
-    { name: 'French Default', lang: 'fr-FR', default: true, localService: true }
-  ];
-  window.SubAudio.refreshVoices();
-  assert.equal(window.SubAudio.preferredVoice.name, 'French Default');
-});
-
 
 test('voice preference persists when disabled from simulator options', () => {
-  assert.equal(window.SubAudio.setVoiceEnabled(false), false);
+  assert.equal(engine.setVoiceEnabled(false), false);
   assert.equal(storedSettings.get('ssn774_voice_enabled'), 'false');
-  assert.equal(window.SubAudio.setVoiceEnabled(true), true);
+  assert.equal(engine.setVoiceEnabled(true), true);
   assert.equal(storedSettings.get('ssn774_voice_enabled'), 'true');
+});
+
+test('local HeadTTS health check recognizes the local server', async () => {
+  assert.equal(await engine.checkLocalTts(), true);
+  assert.equal(engine.ttsOnline, true);
+});
+
+test('VOICE TEST requests neural WAV audio from the local Kokoro engine', async () => {
+  assert.equal(engine.setVoiceProfile('am_michael'), true);
+  assert.equal(engine.testVoice(), true);
+  await engine._ttsProcessing;
+
+  assert.equal(synthRequests.length, 1);
+  assert.match(synthRequests[0].input, /USS Virginia/);
+  assert.equal(synthRequests[0].voice, 'am_michael');
+  assert.equal(synthRequests[0].language, 'en-us');
+  assert.equal(synthRequests[0].audioEncoding, 'wav');
+  assert.ok(voiceStatuses.some((status) => status.state === 'speaking'));
+  assert.equal(engine.voiceSpeaking, false);
 });
