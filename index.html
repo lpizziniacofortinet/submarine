@@ -88,8 +88,6 @@
             <button class="mil-btn" id="btn-time-2x" title="2x Time Compression">2X</button>
             <button class="mil-btn" id="btn-time-5x" title="5x Time Compression">5X</button>
             <button class="mil-btn" id="btn-time-10x" title="10x Time Compression">10X</button>
-            <button class="mil-btn amber active" id="btn-audio-toggle" title="Toggle WebAudio Sound Effects">SND:ON</button>
-            <button class="mil-btn active" id="btn-voice-toggle" title="Toggle local crew voice communications">VOX:ON</button>
           </div>
         </div>
       </div>
@@ -97,17 +95,18 @@
 
     <!-- STATION SELECTOR BAR & MASTER WARNING ANNUNCIATORS -->
     <nav id="station-nav">
-      <button class="station-tab active" data-station="tactical">[F1] GEO / TACTICAL PLOT</button>
-      <button class="station-tab" data-station="sonar">[F2] SONAR &amp; TMA</button>
-      <button class="station-tab" data-station="weapons">[F3] FIRE CONTROL (WEPS)</button>
-      <button class="station-tab" data-station="maneuvering">[F4] MANEUVERING &amp; TRIM</button>
-      <button class="station-tab" data-station="reactor">[F5] S9G NUCLEAR REACTOR</button>
-      <button class="station-tab" data-station="periscope">[F6] PERISCOPE / RADAR / ESM</button>
-      <button class="station-tab" data-station="damage-control">[F7] DAMAGE CONTROL</button>
-      <button class="mil-btn amber" id="btn-open-briefing" style="margin-left:6px;">NATO BASE / MISSION</button>
-      <button class="mil-btn" id="btn-quick-save" title="Save Patrol Progress to Browser Storage">SAVE</button>
-
-      <div class="nav-spacer"></div>
+      <div id="station-primary-row">
+        <button class="station-tab active" data-station="tactical">[F1] GEO / TACTICAL PLOT</button>
+        <button class="station-tab" data-station="sonar">[F2] SONAR &amp; TMA</button>
+        <button class="station-tab" data-station="weapons">[F3] FIRE CONTROL (WEPS)</button>
+        <button class="station-tab" data-station="maneuvering">[F4] MANEUVERING &amp; TRIM</button>
+        <button class="station-tab" data-station="reactor">[F5] S9G NUCLEAR REACTOR</button>
+        <button class="station-tab" data-station="periscope">[F6] PERISCOPE / RADAR / ESM</button>
+        <button class="station-tab" data-station="damage-control">[F7] DAMAGE CONTROL</button>
+        <div class="nav-spacer"></div>
+        <button class="mil-btn amber" id="btn-open-briefing" style="margin-left:6px;">NATO BASE / MISSION</button>
+        <button class="mil-btn" id="btn-quick-save" title="Save Patrol Progress to Browser Storage">SAVE</button>
+      </div>
 
       <!-- Master Warning Annunciator Lights -->
       <div id="annunciator-strip">
@@ -115,7 +114,7 @@
         <div class="annunciator" id="ann-thermocline">BELOW LAYER</div>
         <div class="annunciator" id="ann-esm">ESM DETECT</div>
         <div class="annunciator" id="ann-active-sonar">ACTIVE PING</div>
-        <button type="button" class="annunciator" id="ann-torpedo" aria-label="Silence torpedo warning" title="Click to silence torpedo alarm">TORPEDO IN WATER</button>
+        <button type="button" class="annunciator" id="ann-torpedo" aria-label="Acknowledge torpedo warning" title="Click to silence the torpedo klaxon">TORPEDO IN WATER</button>
         <div class="annunciator" id="ann-depth">TEST DEPTH</div>
         <div class="annunciator" id="ann-scram">RX SCRAM</div>
       </div>
