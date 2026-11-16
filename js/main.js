@@ -236,6 +236,7 @@ class SubmarineWorld {
       // Restore own submarine state (older v2 saves remain supported).
       this.ownSub.reset(s.lat, s.lon, s.heading, s.depthM);
       Object.assign(this.ownSub, s);
+      this.ownSub.damageControl = new window.DamageControlSystem(s.damageControl);
       document.getElementById('input-order-hdg').value = Math.round(this.ownSub.orderedHeading);
       document.getElementById('input-order-depth').value = Math.round(this.ownSub.orderedDepthM);
       document.getElementById('cm-count').textContent = this.ownSub.decoysRemaining;
@@ -368,9 +369,11 @@ class SubmarineWorld {
 
     // 2. Step S9G Nuclear Reactor & Steam Plant
     const rxOut = this.reactor.update(dt, this.ownSub.orderedSpeedKts, this.ownSub.depthM);
+    rxOut.effectiveOrderedSpeedKts *= 0.55 + 0.45 * (this.ownSub.damageControl.getSystemHealth('reactor') / 100);
 
     // 3. Step Submarine Hydrodynamics, Ballast & Own Acoustics
     this.ownSub.update(dt, rxOut, this.currentSeafloorM, this.currentThermoclineM);
+    this.ownSub.updateDamageControl(dt);
 
     // Update WebAudio continuous telemetry (including Hydrophone target blade beats & torpedo whine)
     if (window.SubAudio) {
@@ -842,7 +845,48 @@ class SubmarineWorld {
     this.updateContactsTableUI();
     this.updateSonarAndWeaponsReadouts();
     this.updateManeuveringAndReactorReadouts();
+    this.renderDamageControlUI();
     this.renderWireControlUI();
+  }
+
+  renderDamageControlUI() {
+    const dc = this.ownSub.damageControl;
+    if (!dc) return;
+    const statusClass = (health) => health <= 40 ? 'dc-status-critical' : health <= 75 ? 'dc-status-warn' : 'dc-status-good';
+    for (const [zone, compartment] of Object.entries(dc.compartments)) {
+      const el = document.querySelector(`[data-dc-zone="${zone}"]`);
+      if (!el) continue;
+      const health = Math.round(compartment.integrityPct);
+      el.classList.remove('dc-status-good', 'dc-status-warn', 'dc-status-critical');
+      el.classList.add(statusClass(health));
+      el.querySelector('[data-dc-integrity]').textContent = `${health}%`;
+      el.querySelector('[data-dc-integrity-bar]').style.width = `${health}%`;
+      const flood = Math.round(compartment.floodingPct);
+      el.querySelector('[data-dc-flooding]').textContent = flood > 0 ? `FLOOD ${flood}%` : 'DRY';
+      el.querySelector('[data-dc-flooding]').style.color = flood > 40 ? 'var(--crt-red)' : flood > 0 ? 'var(--crt-amber)' : 'var(--crt-cyan)';
+    }
+
+    const hull = Math.round(this.ownSub.hullIntegrityPct);
+    document.getElementById('dc-hull-integrity').textContent = `${hull}%`;
+    document.getElementById('dc-hull-bar').style.width = `${hull}%`;
+    document.getElementById('dc-flooding-total').textContent = `${Math.round(dc.totalFloodingPct)}%`;
+    document.getElementById('dc-flooding-bar').style.width = `${dc.totalFloodingPct}%`;
+    const overall = document.getElementById('dc-overall-status');
+    overall.textContent = hull <= 40 ? 'HULL: CRITICAL' : hull <= 75 ? 'HULL: DAMAGED' : 'HULL: NOMINAL';
+    overall.className = statusClass(hull);
+
+    for (const row of document.querySelectorAll('[data-dc-system]')) {
+      const health = Math.round(dc.getSystemHealth(row.dataset.dcSystem));
+      const value = row.querySelector('strong');
+      value.textContent = `${health}%`;
+      value.className = statusClass(health);
+    }
+    const pumpState = document.getElementById('dc-pump-state');
+    const pumpButton = document.getElementById('btn-dc-pump');
+    pumpState.textContent = dc.pumping ? 'PUMPS RUNNING' : 'PUMPS STANDBY';
+    pumpState.className = dc.pumping ? 'dc-status-good' : '';
+    pumpButton.textContent = dc.pumping ? 'STOP DEWATERING PUMPS' : 'START DEWATERING PUMPS';
+    pumpButton.classList.toggle('active', dc.pumping);
   }
 
   updateContactsTableUI() {
@@ -1207,7 +1251,22 @@ class SubmarineWorld {
       btn.addEventListener('click', () => this.switchStation(btn.dataset.station));
     });
 
+    // Damage Control station
+    document.getElementById('btn-dc-pump').addEventListener('click', () => {
+      const dc = this.ownSub.damageControl;
+      dc.setPumping(!dc.pumping);
+      this.renderDamageControlUI();
+      window.GameLogger.log('ENG', dc.pumping ? 'Compartment dewatering pumps engaged.' : 'Compartment dewatering pumps secured.', 'conn');
+    });
+
     // Time Compression & Audio
+    const torpedoAnnunciator = document.getElementById('ann-torpedo');
+    torpedoAnnunciator.addEventListener('click', () => {
+      if (window.SubAudio) window.SubAudio.stopAlarm('TORPEDO');
+      torpedoAnnunciator.title = 'Torpedo warning acknowledged; visual warning remains active';
+      window.GameLogger.log('CONN', 'Torpedo warning audible alarm silenced. Visual annunciator remains active while the threat is present.', 'conn');
+    });
+
     const setTimeRate = (rate) => {
       this.timeCompression = rate;
       document.getElementById('hud-sim-rate').textContent = `${rate}x SPEED`;
@@ -1638,6 +1697,7 @@ class SubmarineWorld {
       if (e.key === 'F4') { e.preventDefault(); this.switchStation('maneuvering'); }
       if (e.key === 'F5') { e.preventDefault(); this.switchStation('reactor'); }
       if (e.key === 'F6') { e.preventDefault(); this.switchStation('periscope'); }
+      if (e.key === 'F7') { e.preventDefault(); this.switchStation('damage-control'); }
       if (e.key === 'Escape') { modal.style.display = 'none'; }
       if (e.key === 'a' || e.key === 'A') applyOrderHdg(this.ownSub.orderedHeading - 5);
       if (e.key === 'd' || e.key === 'D') applyOrderHdg(this.ownSub.orderedHeading + 5);

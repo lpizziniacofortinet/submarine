@@ -102,6 +102,7 @@
       <button class="station-tab" data-station="maneuvering">[F4] MANEUVERING &amp; TRIM</button>
       <button class="station-tab" data-station="reactor">[F5] S9G NUCLEAR REACTOR</button>
       <button class="station-tab" data-station="periscope">[F6] PERISCOPE / RADAR / ESM</button>
+      <button class="station-tab" data-station="damage-control">[F7] DAMAGE CONTROL</button>
       <button class="mil-btn amber" id="btn-open-briefing" style="margin-left:6px;">NATO BASE / MISSION</button>
       <button class="mil-btn" id="btn-quick-save" title="Save Patrol Progress to Browser Storage">SAVE</button>
 
@@ -113,7 +114,7 @@
         <div class="annunciator" id="ann-thermocline">BELOW LAYER</div>
         <div class="annunciator" id="ann-esm">ESM DETECT</div>
         <div class="annunciator" id="ann-active-sonar">ACTIVE PING</div>
-        <div class="annunciator" id="ann-torpedo">TORPEDO IN WATER</div>
+        <button type="button" class="annunciator" id="ann-torpedo" aria-label="Silence torpedo warning" title="Click to silence torpedo alarm">TORPEDO IN WATER</button>
         <div class="annunciator" id="ann-depth">TEST DEPTH</div>
         <div class="annunciator" id="ann-scram">RX SCRAM</div>
       </div>
@@ -615,6 +616,56 @@
           </div>
         </section>
 
+        <!-- ================================================================
+             STATION 7: DAMAGE CONTROL
+             ================================================================ -->
+        <section id="screen-damage-control" class="station-screen">
+          <div class="crt-panel dc-main-panel">
+            <div class="panel-header">
+              <span>SHIP DAMAGE CONTROL // COMPARTMENT STATUS</span>
+              <span id="dc-overall-status" class="dc-status-good">HULL: NOMINAL</span>
+            </div>
+            <div class="dc-legend">
+              <span><i class="dc-dot dc-status-good"></i> NOMINAL</span>
+              <span><i class="dc-dot dc-status-warn"></i> DAMAGED</span>
+              <span><i class="dc-dot dc-status-critical"></i> CRITICAL</span>
+            </div>
+            <div class="dc-ship-schematic" role="img" aria-label="Longitudinal submarine compartment damage diagram">
+              <div class="dc-bow-cap">BOW</div>
+              <div class="dc-compartment" data-dc-zone="bow"><strong>BOW / SONAR</strong><span data-dc-integrity>100%</span><div class="dc-bar"><i data-dc-integrity-bar></i></div><small>Array / Torpedo Room</small><em data-dc-flooding>DRY</em></div>
+              <div class="dc-compartment" data-dc-zone="operations"><strong>OPERATIONS</strong><span data-dc-integrity>100%</span><div class="dc-bar"><i data-dc-integrity-bar></i></div><small>Control / Electrical</small><em data-dc-flooding>DRY</em></div>
+              <div class="dc-compartment" data-dc-zone="reactor"><strong>REACTOR</strong><span data-dc-integrity>100%</span><div class="dc-bar"><i data-dc-integrity-bar></i></div><small>Plant / Cooling</small><em data-dc-flooding>DRY</em></div>
+              <div class="dc-compartment" data-dc-zone="engineering"><strong>ENGINEERING</strong><span data-dc-integrity>100%</span><div class="dc-bar"><i data-dc-integrity-bar></i></div><small>Propulsion / Ballast</small><em data-dc-flooding>DRY</em></div>
+              <div class="dc-compartment" data-dc-zone="stern"><strong>STERN</strong><span data-dc-integrity>100%</span><div class="dc-bar"><i data-dc-integrity-bar></i></div><small>Shaft / Steering</small><em data-dc-flooding>DRY</em></div>
+              <div class="dc-stern-cap">AFT</div>
+            </div>
+            <div class="dc-hull-readout">
+              <span>PRESSURE HULL INTEGRITY</span><strong id="dc-hull-integrity">100%</strong>
+              <div class="dc-bar"><i id="dc-hull-bar"></i></div>
+              <span>AVERAGE COMPARTMENT FLOODING</span><strong id="dc-flooding-total">0%</strong>
+              <div class="dc-bar"><i id="dc-flooding-bar"></i></div>
+            </div>
+            <p class="dc-note">Flooding adds weight and affects depth control. Dewatering reduces flooding but does not repair structural damage.</p>
+          </div>
+          <div class="crt-panel">
+            <div class="panel-header"><span>SYSTEM CASUALTY STATUS</span><span>LIVE</span></div>
+            <div id="dc-system-list" class="dc-system-list">
+              <div data-dc-system="sonar"><span>SONAR ARRAY</span><strong>100%</strong></div>
+              <div data-dc-system="command"><span>COMMAND / CONTROL</span><strong>100%</strong></div>
+              <div data-dc-system="reactor"><span>REACTOR PLANT</span><strong>100%</strong></div>
+              <div data-dc-system="propulsion"><span>PROPULSION</span><strong>100%</strong></div>
+              <div data-dc-system="steering"><span>STEERING</span><strong>100%</strong></div>
+              <div data-dc-system="ballast"><span>BALLAST SYSTEM</span><strong>100%</strong></div>
+              <div data-dc-system="electrical"><span>ELECTRICAL</span><strong>100%</strong></div>
+            </div>
+            <div class="dc-pump-control">
+              <div class="panel-header"><span>FLOODING CONTROL</span><span id="dc-pump-state">PUMPS STANDBY</span></div>
+              <p>Start dewatering pumps to reduce accumulated compartment flooding. Structural damage remains.</p>
+              <button class="mil-btn amber" id="btn-dc-pump">START DEWATERING PUMPS</button>
+            </div>
+          </div>
+        </section>
+
       </div>
 
       <!-- ==================================================================
@@ -709,7 +760,7 @@
       <div id="combat-log"></div>
       <div class="crt-panel" style="justify-content:space-between; font-size:10px;">
         <div style="color:var(--crt-amber); font-weight:bold;">HOTKEYS &amp; COMMANDS</div>
-        <div><strong style="color:var(--crt-cyan)">[F1-F6]</strong> Switch Station | <strong style="color:var(--crt-cyan)">[A/D]</strong> Turn ±5°</div>
+        <div><strong style="color:var(--crt-cyan)">[F1-F7]</strong> Switch Station | <strong style="color:var(--crt-cyan)">[A/D]</strong> Turn ±5°</div>
         <div><strong style="color:var(--crt-cyan)">[W/S]</strong> Depth ±10m | <strong style="color:var(--crt-cyan)">[1-6]</strong> Speed Telegraph</div>
         <div><strong style="color:var(--crt-cyan)">[P]</strong> Active Sonar Ping | <strong style="color:var(--crt-cyan)">[C]</strong> Launch Decoy</div>
       </div>
@@ -787,6 +838,7 @@
   <script src="js/audio.js"></script>
   <script src="js/bathymetry.js"></script>
   <script src="js/reactor.js"></script>
+  <script src="js/damage-control.js"></script>
   <script src="js/physics.js"></script>
   <script src="js/missions.js"></script>
   <script src="js/entities.js"></script>

@@ -14,10 +14,11 @@ The project is built with HTML5, CSS, Canvas, and vanilla JavaScript. It has no 
 - Simulated commercial shipping, hostile and friendly contacts, and marine-life encounters.
 
 ### Submarine operations
-- Six operator stations: tactical plot, sonar, weapons, maneuvering, reactor, and periscope/ESM.
+- Seven operator stations: tactical plot, sonar, weapons, maneuvering, reactor, periscope/ESM, and damage control.
 - Helm orders, depth control, hydroplanes, rudder, ballast, trim, and emergency surfacing.
 - A simplified S9G-inspired reactor and propulsion model with control rods, coolant-pump modes, battery, diesel generator, and SCRAM protection.
 - Torpedo tubes, VLS launch controls, wire-guidance gameplay, and acoustic decoys.
+- Compartment-based damage control, localized flooding, dewatering, and subsystem degradation.
 
 ### Sensors and acoustic environment
 - Passive broadband bearing-time waterfall and a profile-based LOFAR/DEMON-style display.
@@ -28,6 +29,7 @@ The project is built with HTML5, CSS, Canvas, and vanilla JavaScript. It has no 
 
 ### Persistence and simulation controls
 - Fixed-step simulation clock.
+- F7 damage-control station with a live longitudinal compartment diagram.
 - 1x, 2x, 5x, and 10x time-compression controls.
 - Browser local-storage autosave and manual save/resume.
 - JSON save export.
@@ -70,7 +72,7 @@ An internet connection is required for third-party map tiles and the optional on
 
 ## Tests
 
-The project includes Node.js unit tests for the fixed-step simulation clock. From the project directory, run:
+The project includes Node.js unit tests for the fixed-step simulation clock and compartment damage-control model. From the project directory, run:
 
 ```bash
 node --test tests/*.test.js
@@ -88,7 +90,8 @@ submarine/
 ├── css/
 │   └── style.css               # CRT-inspired interface styling
 ├── tests/
-│   └── simulation-clock.test.js
+│   ├── simulation-clock.test.js
+│   └── damage-control.test.js
 └── js/
     ├── simulation-clock.js     # Fixed-step simulation clock
     ├── audio.js                # Procedural Web Audio effects
@@ -96,6 +99,7 @@ submarine/
     ├── entities.js             # Contacts, tracking, weapons, and serialization
     ├── main.js                 # Simulation loop, UI controller, and save/load
     ├── missions.js             # Bases, acoustic profiles, missions, and generated traffic
+    ├── damage-control.js       # Compartment integrity, flooding, and system-health model
     ├── physics.js              # Submarine movement, ballast, and sonar propagation model
     ├── reactor.js              # Simplified reactor and propulsion plant model
     └── stations.js             # Map, sonar, TMA, reactor, and periscope renderers

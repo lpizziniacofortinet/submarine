@@ -47,6 +47,7 @@ class SubmarinePhysics {
 
     // Structural & Damage State
     this.hullIntegrityPct = 100.0;
+    this.damageControl = new window.DamageControlSystem();
     this.testDepthM = 490;
     this.crushDepthM = 730;
 
@@ -68,6 +69,10 @@ class SubmarinePhysics {
 
     // Waypoint navigation
     this.waypoint = null; // { lat, lon }
+  }
+
+  updateDamageControl(dt) {
+    this.damageControl.update(dt);
   }
 
   /**
@@ -110,7 +115,8 @@ class SubmarinePhysics {
     }
 
     // 3. Speed & Propulsion Dynamics
-    const targetSpeed = reactorOutput.effectiveOrderedSpeedKts;
+    const propulsionHealth = this.damageControl.getSystemHealth('propulsion') / 100;
+    const targetSpeed = reactorOutput.effectiveOrderedSpeedKts * (0.35 + 0.65 * propulsionHealth);
     const accelRate = targetSpeed > this.speedKts ? 0.55 : 0.75; // knots per second
     if (Math.abs(targetSpeed - this.speedKts) <= accelRate * dt) {
       this.speedKts = targetSpeed;
@@ -153,13 +159,16 @@ class SubmarinePhysics {
 
     // Turn rate depends on rudder angle and water flow over rudder
     const effectiveFlowKts = Math.max(1.5, Math.abs(this.speedKts));
-    const turnRateDegPerSec = (this.rudderDeg / 30.0) * Math.min(3.2, effectiveFlowKts * 0.22) * (this.speedKts >= 0 ? 1 : -1);
+    const steeringHealth = this.damageControl.getSystemHealth('steering') / 100;
+    const turnRateDegPerSec = (this.rudderDeg / 30.0) * Math.min(3.2, effectiveFlowKts * 0.22) * (0.4 + 0.6 * steeringHealth) * (this.speedKts >= 0 ? 1 : -1);
     this.heading = (this.heading + turnRateDegPerSec * dt + 360) % 360;
 
     // 5. Main Ballast Tanks (MBT) & High-Pressure Air Physics
+    const ballastHealth = this.damageControl.getSystemHealth('ballast') / 100;
+    const ballastEffectiveness = 0.4 + 0.6 * ballastHealth;
     if (this.mbtVentsOpen) {
       // Flooding MBTs
-      this.mbtFillPct = Math.min(100.0, this.mbtFillPct + 14.0 * dt);
+      this.mbtFillPct = Math.min(100.0, this.mbtFillPct + 14.0 * ballastEffectiveness * dt);
       if (this.mbtFillPct >= 100.0) {
         this.mbtVentsOpen = false;
       }
@@ -167,7 +176,7 @@ class SubmarinePhysics {
 
     if (this.mbtBlowState === 'NORMAL') {
       if (this.hpAirPsi > 150) {
-        this.mbtFillPct = Math.max(0.0, this.mbtFillPct - 5.5 * dt);
+        this.mbtFillPct = Math.max(0.0, this.mbtFillPct - 5.5 * ballastEffectiveness * dt);
         this.hpAirPsi = Math.max(0, this.hpAirPsi - 28 * dt);
         this.addAcousticTransient(14);
         if (this.mbtFillPct <= 0) this.mbtBlowState = 'OFF';
@@ -176,7 +185,7 @@ class SubmarinePhysics {
       }
     } else if (this.mbtBlowState === 'EMERGENCY') {
       if (this.hpAirPsi > 200) {
-        this.mbtFillPct = Math.max(0.0, this.mbtFillPct - 24.0 * dt);
+        this.mbtFillPct = Math.max(0.0, this.mbtFillPct - 24.0 * ballastEffectiveness * dt);
         this.hpAirPsi = Math.max(0, this.hpAirPsi - 140 * dt);
         this.addAcousticTransient(38); // Loud high-pressure roar!
         if (this.mbtFillPct <= 0) this.mbtBlowState = 'OFF';
@@ -205,7 +214,7 @@ class SubmarinePhysics {
 
     // Positive buoyancy from unflooded MBT (+650 tons when 0% flooded) - Aux Trim + Hull Compression
     const mbtPositiveBuoyancyTons = (100.0 - this.mbtFillPct) * 6.5;
-    const netBuoyancyTons = mbtPositiveBuoyancyTons - this.auxTrimTons - hullCompressionTons;
+    const netBuoyancyTons = mbtPositiveBuoyancyTons - this.auxTrimTons - hullCompressionTons - this.damageControl.floodingWeightTons;
 
     // 7. Auto-Depth Controller & Hydroplanes (Bow & Stern Planes)
     if (this.autoDepth) {
@@ -254,6 +263,7 @@ class SubmarinePhysics {
       if (Math.abs(this.speedKts) > 3) {
         const dmg = Math.abs(this.speedKts) * 0.35 * dt;
         this.hullIntegrityPct = Math.max(0, this.hullIntegrityPct - dmg);
+        this.damageControl.applyWear('bow', dmg * 2.2);
         this.addAcousticTransient(35);
       }
     }
@@ -263,6 +273,7 @@ class SubmarinePhysics {
       const overDepth = this.depthM - this.testDepthM;
       const stressDmg = (overDepth / (this.crushDepthM - this.testDepthM)) * 2.8 * dt;
       this.hullIntegrityPct = Math.max(0, this.hullIntegrityPct - stressDmg);
+      this.damageControl.applyWear('operations', stressDmg * 1.5);
       if (this.depthM >= this.crushDepthM) {
         this.hullIntegrityPct = 0;
       }
@@ -280,6 +291,7 @@ class SubmarinePhysics {
         this.speedKts = 0;
         this.orderedSpeedKts = 0;
         this.hullIntegrityPct = Math.max(0, this.hullIntegrityPct - 5);
+        this.damageControl.applyHit('bow', 8, 0);
         this.addAcousticTransient(40);
         if (window.GameLogger) {
           window.GameLogger.log('CONN', 'GROUNDING ALERT! Shoal or landmass ahead! All Stop!', 'alert');
@@ -321,6 +333,7 @@ class SubmarinePhysics {
     listenerHeading,
     listenerSpeedKts,
     listenerHasTowedArray,
+    listenerBowArrayHealth = 100,
     thermoclineDepthM
   }) {
     const rangeNm = Math.max(0.05, window.Bathymetry.distanceNm(listenerLat, listenerLon, sourceLat, sourceLon));
@@ -359,6 +372,8 @@ class SubmarinePhysics {
     }
 
     // Ambient Sea State 3 Noise (~62 dB effective in band) + Listener Own-Ship Flow Self-Noise
+    arrayGainDb -= (1 - Math.max(0, Math.min(100, listenerBowArrayHealth)) / 100) * 12.0;
+
     const selfNoiseDb = 58.0 + Math.pow(Math.abs(listenerSpeedKts), 1.55) * 1.1;
 
     const snrDb = sourceNoiseDb - spreadingLossDb - layerLossDb - selfNoiseDb + arrayGainDb;

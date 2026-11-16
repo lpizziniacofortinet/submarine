@@ -156,13 +156,22 @@ body.red-alert {
 /* Station Navigation Tabs */
 #station-nav {
   display: flex;
+  flex-wrap: wrap;
+  align-content: center;
   background: #0a140e;
   border-bottom: 2px solid var(--border-color);
-  height: 32px;
-  padding: 2px 6px;
+  height: auto;
+  min-height: 32px;
+  padding: 3px 6px;
   gap: 4px;
   align-items: center;
   flex-shrink: 0;
+}
+
+#station-nav > .station-tab,
+#station-nav > .mil-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .station-tab {
@@ -203,7 +212,12 @@ body.red-alert {
 /* Warning Annunciator Lights in Nav Bar */
 #annunciator-strip {
   display: flex;
+  flex-wrap: wrap;
   gap: 4px;
+}
+
+.annunciator {
+  white-space: nowrap;
 }
 
 .annunciator {
@@ -734,4 +748,51 @@ select.mil-select, input.mil-input {
 @keyframes popupSlideIn {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+ 
+/* Station 7: DAMAGE CONTROL */
+#screen-damage-control {
+  grid-template-columns: minmax(0, 1.6fr) minmax(280px, 0.8fr);
+  gap: 6px;
+}
+.dc-main-panel { gap: 10px; }
+.dc-legend { display:flex; gap:16px; flex-wrap:wrap; color:var(--text-muted); font-size:10px; }
+.dc-legend span { display:flex; align-items:center; gap:5px; }
+.dc-dot { width:8px; height:8px; display:inline-block; border-radius:50%; }
+.dc-status-good { color:var(--crt-green) !important; }
+.dc-status-warn { color:var(--crt-amber) !important; }
+.dc-status-critical { color:var(--crt-red) !important; }
+.dc-dot.dc-status-good { background:var(--crt-green); }
+.dc-dot.dc-status-warn { background:var(--crt-amber); }
+.dc-dot.dc-status-critical { background:var(--crt-red); }
+.dc-ship-schematic { display:flex; align-items:stretch; gap:3px; min-height:190px; padding:18px 4px; border:1px solid var(--border-color); background:repeating-linear-gradient(0deg,#030805,#030805 3px,#06100a 4px); }
+.dc-bow-cap,.dc-stern-cap { display:flex; align-items:center; justify-content:center; writing-mode:vertical-rl; color:var(--crt-cyan); font-size:9px; letter-spacing:1px; border:1px solid var(--border-color); padding:4px; }
+.dc-stern-cap { transform:rotate(180deg); }
+.dc-compartment { min-width:0; flex:1; display:flex; flex-direction:column; justify-content:center; gap:8px; padding:8px 5px; border:1px solid var(--crt-green); background:#07150b; color:var(--crt-green); text-align:center; }
+.dc-compartment strong { font-size:10px; }
+.dc-compartment span { font-size:18px; font-weight:bold; font-variant-numeric:tabular-nums; }
+.dc-compartment small { font-size:9px; color:var(--text-muted); }
+.dc-compartment em { font-size:9px; font-style:normal; color:var(--crt-cyan); }
+.dc-compartment.dc-status-warn { border-color:var(--crt-amber); background:#1b1607; }
+.dc-compartment.dc-status-critical { border-color:var(--crt-red); background:#210909; }
+.dc-bar { height:8px; border:1px solid var(--border-color); background:#020503; overflow:hidden; }
+.dc-bar i { display:block; height:100%; width:100%; background:var(--crt-green); transition:width .2s linear; }
+.dc-compartment.dc-status-warn .dc-bar i { background:var(--crt-amber); }
+.dc-compartment.dc-status-critical .dc-bar i { background:var(--crt-red); }
+.dc-hull-readout { display:grid; grid-template-columns:1fr auto; gap:5px 10px; font-size:10px; }
+.dc-hull-readout .dc-bar { grid-column:1 / -1; }
+.dc-note { color:var(--text-muted); font-size:10px; border-top:1px solid var(--border-color); padding-top:7px; }
+.dc-system-list { display:flex; flex-direction:column; gap:5px; }
+.dc-system-list > div { display:flex; justify-content:space-between; gap:8px; padding:8px; border:1px solid var(--border-color); background:#06100a; font-size:11px; }
+.dc-system-list strong { font-variant-numeric:tabular-nums; }
+.dc-pump-control { margin-top:auto; border-top:1px solid var(--border-color); padding-top:8px; }
+.dc-pump-control p { font-size:10px; color:var(--text-muted); line-height:1.5; }
+.dc-pump-control button { width:100%; }
+@media (max-width: 1050px) {
+  #screen-damage-control { grid-template-columns:1fr; overflow-y:auto; }
+  .dc-ship-schematic { min-height:150px; }
+  .dc-compartment { padding:5px 2px; }
+  .dc-compartment strong { font-size:8px; }
+  .dc-compartment small { font-size:8px; }
 }

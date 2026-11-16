@@ -262,6 +262,7 @@ class ContactEntity {
       listenerHeading: ownSub.heading,
       listenerSpeedKts: ownSub.speedKts,
       listenerHasTowedArray: ownSub.towedArrayDeployed,
+      listenerBowArrayHealth: ownSub.damageControl.getSystemHealth('sonar'),
       thermoclineDepthM
     });
 
@@ -560,11 +561,23 @@ class WeaponEntity {
         this.exploded = true;
         if (window.SubAudio) window.SubAudio.playExplosion(0.1);
         ownSub.hullIntegrityPct = Math.max(0, ownSub.hullIntegrityPct - 42);
+        const incomingBearing = window.Bathymetry.bearingDeg(ownSub.lat, ownSub.lon, this.lat, this.lon);
+        const relativeBearing = (incomingBearing - ownSub.heading + 360) % 360;
+        const hitZone = relativeBearing < 36 || relativeBearing >= 324
+          ? 'bow'
+          : relativeBearing < 108
+          ? 'operations'
+          : relativeBearing < 180
+          ? 'reactor'
+          : relativeBearing < 252
+          ? 'engineering'
+          : 'stern';
+        ownSub.damageControl.applyHit(hitZone, 42, 24);
         ownSub.addAcousticTransient(50);
         if (window.GameLogger) {
           window.GameLogger.log(
             'ENG',
-            `TORPEDO IMPACT! Hull integrity at ${Math.round(ownSub.hullIntegrityPct)}%! Shockwave in engine room!`,
+            `TORPEDO IMPACT! ${hitZone.toUpperCase()} COMPARTMENT HIT // Hull integrity ${Math.round(ownSub.hullIntegrityPct)}% // Flooding reported.`,
             'alert'
           );
         }
