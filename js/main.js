@@ -1607,14 +1607,16 @@ class SubmarineWorld {
       }
       this.ownSub.periscopeRaised = !this.ownSub.periscopeRaised;
       e.target.classList.toggle('active', this.ownSub.periscopeRaised);
+      e.target.textContent = this.ownSub.periscopeRaised ? 'MAST: RAISED' : 'RAISE MAST';
     });
     document.getElementById('btn-scope-ir').addEventListener('click', (e) => {
       window.Stations.scopeThermal = !window.Stations.scopeThermal;
       e.target.classList.toggle('active', window.Stations.scopeThermal);
+      e.target.textContent = window.Stations.scopeThermal ? 'FLIR: ON' : 'FLIR: OFF';
     });
     document.getElementById('btn-scope-zoom').addEventListener('click', (e) => {
       window.Stations.scopeZoom = window.Stations.scopeZoom === 1.5 ? 4.0 : 1.5;
-      e.target.textContent = `MAG: ${window.Stations.scopeZoom}X`;
+      e.target.textContent = `ZOOM ${window.Stations.scopeZoom.toFixed(1)}×`;
     });
     document.getElementById('btn-scope-left').addEventListener('click', () => {
       window.Stations.scopeBearing = (window.Stations.scopeBearing - 10 + 360) % 360;
