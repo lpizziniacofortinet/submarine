@@ -851,10 +851,23 @@
             </span>
             <input type="checkbox" id="opt-crew-voice-enabled" checked>
           </label>
-          <div id="opt-crew-voice-status" class="option-setting-status" role="status" aria-live="polite">
-            Voice communications enabled.
+          <div class="option-setting-row">
+            <span>
+              <strong>CREW VOICE PROFILE</strong>
+              <small>Choose the neural Kokoro voice used for crew callouts.</small>
+            </span>
+            <select id="opt-crew-voice-profile" class="mil-select" aria-label="Crew voice profile">
+              <option value="am_michael">MICHAEL — US MALE</option>
+              <option value="am_fenrir">FENRIR — US MALE</option>
+              <option value="am_onyx">ONYX — US MALE</option>
+              <option value="af_bella">BELLA — US FEMALE</option>
+              <option value="af_sarah">SARAH — US FEMALE</option>
+            </select>
           </div>
-          <p class="option-note">This setting is saved in this browser and is independent from procedural sound effects (SND). You can also use the VOX quick toggle in the command bar.</p>
+          <div id="opt-crew-voice-status" class="option-setting-status" role="status" aria-live="polite">
+            Local Kokoro voice engine: checking…
+          </div>
+          <p class="option-note">The voice profile is saved in this browser. Voice generation runs on the local HeadTTS/Kokoro server at 127.0.0.1:8882; no audio is sent to a cloud TTS provider. Procedural sound effects (SND) remain independent from VOX.</p>
         </div>
       </div>
     </div>
@@ -865,6 +878,7 @@
 
   <!-- Simulation Modules -->
   <script src="js/audio.js"></script>
+  <script src="js/local-tts.js"></script>
   <script src="js/bathymetry.js"></script>
   <script src="js/reactor.js"></script>
   <script src="js/damage-control.js"></script>
