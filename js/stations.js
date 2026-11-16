@@ -1027,8 +1027,16 @@ class StationRenderers {
       const terrainStatus = this.coastlineModel ? this.coastlineModel.status : 'UNAVAILABLE';
       const terrainStatusEl = document.getElementById('scope-terrain-status');
       if (terrainStatusEl) {
-        terrainStatusEl.textContent = raised ? 'TERRAIN DATA: ' + terrainStatus : 'TERRAIN DATA: STANDBY';
-        terrainStatusEl.dataset.state = raised ? String(terrainStatus).toLowerCase() : 'standby';
+        const localFallback = Boolean(terrainProfile && terrainProfile.fallback);
+        const displayStatus = localFallback && terrainStatus === 'LOADING'
+          ? 'LOCAL LAND / DEM LOADING'
+          : localFallback && terrainStatus === 'OFFLINE'
+          ? 'LOCAL LAND / DEM OFFLINE'
+          : localFallback
+          ? 'LOCAL LAND'
+          : terrainStatus;
+        terrainStatusEl.textContent = raised ? 'TERRAIN DATA: ' + displayStatus : 'TERRAIN DATA: STANDBY';
+        terrainStatusEl.dataset.state = raised ? (localFallback ? 'fallback' : String(terrainStatus).toLowerCase()) : 'standby';
       }
       const thermal = Boolean(this.scopeThermal);
       const liveMark = scopeCanvas.parentElement?.querySelector('.scope-live-mark');
