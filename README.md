@@ -50,7 +50,7 @@ These limitations are explicit so that the interface's realistic presentation is
 
 ## Run locally
 
-No package installation, build tool, or server-side application is required.
+The core simulator needs no package installation or build step. Optional neural crew voices run in a separate local Node.js server.
 
 ### Recommended: local HTTP server
 
@@ -107,11 +107,15 @@ submarine/
 ├── HOWTO.md                    # Operator guide
 ├── css/
 │   └── style.css               # CRT-inspired interface styling
+├── tts-server/
+│   ├── headtts-node.json       # Local Kokoro REST server configuration
+│   └── start.mjs               # Installs and starts the separate local TTS process
 ├── tests/
 │   ├── simulation-clock.test.js
 │   ├── damage-control.test.js
 │   └── voice-callouts.test.js
 └── js/
+    ├── local-tts.js            # Local Kokoro client and radio audio chain
     ├── simulation-clock.js     # Fixed-step simulation clock
     ├── audio.js                # Procedural Web Audio effects
     ├── bathymetry.js           # Procedural Mediterranean geography and acoustic profile
