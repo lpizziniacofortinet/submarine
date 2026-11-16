@@ -93,7 +93,8 @@ submarine/
 │   └── style.css               # CRT-inspired interface styling
 ├── tests/
 │   ├── simulation-clock.test.js
-│   └── damage-control.test.js
+│   ├── damage-control.test.js
+│   └── voice-callouts.test.js
 └── js/
     ├── simulation-clock.js     # Fixed-step simulation clock
     ├── audio.js                # Procedural Web Audio effects
