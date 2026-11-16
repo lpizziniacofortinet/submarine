@@ -164,9 +164,11 @@ class SubmarinePhysics {
     this.heading = (this.heading + turnRateDegPerSec * dt + 360) % 360;
 
     // 5. Main Ballast Tanks (MBT) & High-Pressure Air Physics
+    const ballastHealth = this.damageControl.getSystemHealth('ballast') / 100;
+    const ballastEffectiveness = 0.4 + 0.6 * ballastHealth;
     if (this.mbtVentsOpen) {
       // Flooding MBTs
-      this.mbtFillPct = Math.min(100.0, this.mbtFillPct + 14.0 * dt);
+      this.mbtFillPct = Math.min(100.0, this.mbtFillPct + 14.0 * ballastEffectiveness * dt);
       if (this.mbtFillPct >= 100.0) {
         this.mbtVentsOpen = false;
       }
@@ -174,7 +176,7 @@ class SubmarinePhysics {
 
     if (this.mbtBlowState === 'NORMAL') {
       if (this.hpAirPsi > 150) {
-        this.mbtFillPct = Math.max(0.0, this.mbtFillPct - 5.5 * dt);
+        this.mbtFillPct = Math.max(0.0, this.mbtFillPct - 5.5 * ballastEffectiveness * dt);
         this.hpAirPsi = Math.max(0, this.hpAirPsi - 28 * dt);
         this.addAcousticTransient(14);
         if (this.mbtFillPct <= 0) this.mbtBlowState = 'OFF';
@@ -183,7 +185,7 @@ class SubmarinePhysics {
       }
     } else if (this.mbtBlowState === 'EMERGENCY') {
       if (this.hpAirPsi > 200) {
-        this.mbtFillPct = Math.max(0.0, this.mbtFillPct - 24.0 * dt);
+        this.mbtFillPct = Math.max(0.0, this.mbtFillPct - 24.0 * ballastEffectiveness * dt);
         this.hpAirPsi = Math.max(0, this.hpAirPsi - 140 * dt);
         this.addAcousticTransient(38); // Loud high-pressure roar!
         if (this.mbtFillPct <= 0) this.mbtBlowState = 'OFF';
@@ -331,6 +333,7 @@ class SubmarinePhysics {
     listenerHeading,
     listenerSpeedKts,
     listenerHasTowedArray,
+    listenerBowArrayHealth = 100,
     thermoclineDepthM
   }) {
     const rangeNm = Math.max(0.05, window.Bathymetry.distanceNm(listenerLat, listenerLon, sourceLat, sourceLon));
@@ -369,6 +372,8 @@ class SubmarinePhysics {
     }
 
     // Ambient Sea State 3 Noise (~62 dB effective in band) + Listener Own-Ship Flow Self-Noise
+    arrayGainDb -= (1 - Math.max(0, Math.min(100, listenerBowArrayHealth)) / 100) * 12.0;
+
     const selfNoiseDb = 58.0 + Math.pow(Math.abs(listenerSpeedKts), 1.55) * 1.1;
 
     const snrDb = sourceNoiseDb - spreadingLossDb - layerLossDb - selfNoiseDb + arrayGainDb;
