@@ -171,7 +171,7 @@ class SubAudioEngine {
       .replace(/>=/g, ' at or above ')
       .replace(/°/g, ' degrees ')
       .replace(/\bKT\b/gi, ' knots ')
-      .replace(/\s+/g, ' ');
+      .replace(/\s+/g, ' ')
       .replace(/\s+([,!.?])/g, '$1');
     const callsign = station === 'SONAR' ? 'Sonar, Conn.' :
       station === 'WEPS' ? 'Weapons, Conn.' :
