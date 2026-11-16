@@ -6,6 +6,19 @@
  */
 
 class ContactEntity {
+  static shouldLaunchHostileTorpedo({
+    hasContact, attackState, rangeNm, reloadTimerSec, torpedoesRemaining,
+    shotsThisEngagement, activeHostileTorpedoes
+  }) {
+    return Boolean(hasContact && attackState === 'ATTACK') &&
+      Number.isFinite(rangeNm) &&
+      rangeNm >= 0.8 && rangeNm <= 5.0 &&
+      reloadTimerSec <= 0 &&
+      torpedoesRemaining > 0 &&
+      shotsThisEngagement < 1 &&
+      activeHostileTorpedoes < 2;
+  }
+
   constructor(index, config) {
     this.id = config.id || `S-${index}`;
     this.designation = config.designation || `SIERRA-${index}`;
@@ -26,8 +39,10 @@ class ContactEntity {
     this.aiState = config.aiState || 'PATROL'; // 'PATROL', 'INVESTIGATE', 'ATTACK', 'EVADE'
     this.alertedBearing = config.alertedBearing !== undefined ? config.alertedBearing : null;
     this.activeSonarCooldown = config.activeSonarCooldown ?? (25 + Math.random() * 35);
-    this.weaponReloadTimer = config.weaponReloadTimer ?? 15;
+    this.weaponReloadTimer = config.weaponReloadTimer ?? (20 + Math.random() * 40);
     this.torpedoesRemaining = config.torpedoesRemaining !== undefined ? config.torpedoesRemaining : (this.profile.torpedoCount || 0);
+    this.hostileShotsThisEngagement = config.hostileShotsThisEngagement ?? 0;
+    this.contactLostTimer = config.contactLostTimer ?? 0;
     this.decoysRemaining = config.decoysRemaining !== undefined ? config.decoysRemaining : 4;
     this.bioWanderTimer = config.bioWanderTimer ?? (20 + Math.random() * 40);
 
@@ -66,6 +81,8 @@ class ContactEntity {
       alertedBearing: this.alertedBearing,
       activeSonarCooldown: this.activeSonarCooldown,
       weaponReloadTimer: this.weaponReloadTimer,
+      hostileShotsThisEngagement: this.hostileShotsThisEngagement,
+      contactLostTimer: this.contactLostTimer,
       bioWanderTimer: this.bioWanderTimer,
       torpedoesRemaining: this.torpedoesRemaining,
       decoysRemaining: this.decoysRemaining,
@@ -214,8 +231,17 @@ class ContactEntity {
     }
 
     if (detectedPlayer) {
+      this.contactLostTimer = 0;
       this.alertedBearing = brgToPlayer + (Math.random() - 0.5) * 4.0;
       this.aiState = passiveCheck.snrDb > 9.0 || trueRangeNm < 5.5 ? 'ATTACK' : 'INVESTIGATE';
+    } else {
+      this.contactLostTimer += dt;
+      if (this.contactLostTimer >= 90 && this.hostileShotsThisEngagement > 0) {
+        this.hostileShotsThisEngagement = 0;
+        this.alertedBearing = null;
+        this.aiState = 'INVESTIGATE';
+        this.weaponReloadTimer = Math.max(this.weaponReloadTimer, 90);
+      }
     }
 
     if (this.aiState === 'INVESTIGATE' && this.alertedBearing !== null) {
@@ -241,10 +267,23 @@ class ContactEntity {
       this.orderedHeading = Math.round(this.alertedBearing) % 360;
       this.orderedSpeedKts = 16;
 
-      if (this.torpedoesRemaining > 0 && this.weaponReloadTimer <= 0 && trueRangeNm < 6.2) {
+      const activeHostileTorpedoes = world.weapons.filter(
+        (weapon) => !weapon.isPlayer && weapon.type === 'TORPEDO' && !weapon.exploded
+      ).length;
+      const launchAuthorized = ContactEntity.shouldLaunchHostileTorpedo({
+        hasContact: detectedPlayer,
+        attackState: this.aiState,
+        rangeNm: trueRangeNm,
+        reloadTimerSec: this.weaponReloadTimer,
+        torpedoesRemaining: this.torpedoesRemaining,
+        shotsThisEngagement: this.hostileShotsThisEngagement,
+        activeHostileTorpedoes
+      });
+
+      if (launchAuthorized && world.fireHostileTorpedo(this, brgToPlayer, ownSub.depthM)) {
         this.torpedoesRemaining--;
-        this.weaponReloadTimer = 55;
-        world.fireHostileTorpedo(this, brgToPlayer, ownSub.depthM);
+        this.hostileShotsThisEngagement++;
+        this.weaponReloadTimer = 210 + Math.random() * 90;
       }
     }
   }
