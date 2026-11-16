@@ -33,6 +33,13 @@ test('fallback profile contains 72 bearings and detects coast from offshore', ()
   assert.ok(profile.rays.some((ray) => ray.hasLand), 'at least one coastline ray is visible');
 });
 
+test('fallback profile includes the Provençal coast from the Toulon departure sector', () => {
+  const start = CoastlineModel.destinationPoint(42.92, 5.94, 177.5, 5.25 * 1.852);
+  const profile = CoastlineModel.buildFallbackProfile(start.lat, start.lon);
+  const visibleBearings = profile.rays.filter((ray) => ray.hasLand).map((ray) => ray.bearing);
+  assert.ok(visibleBearings.some((bearing) => bearing <= 30 || bearing >= 330));
+});
+
 test('local land profile is available immediately while the DEM request is loading', () => {
   const model = new CoastlineModel();
   model.updatePosition(43.9, 10.2);
