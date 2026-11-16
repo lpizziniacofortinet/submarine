@@ -850,3 +850,22 @@ select.mil-select, input.mil-input {
   line-height: 1.5;
   margin-top: 8px;
 }
+
+
+.options-section .option-setting-row select {
+  min-width: 190px;
+  max-width: 260px;
+  background: #07150d;
+  color: var(--crt-cyan);
+  border: 1px solid var(--border-color);
+  padding: 7px 8px;
+  font: inherit;
+}
+.option-setting-status[data-state="offline"],
+.option-setting-status[data-state="error"] {
+  color: var(--crt-amber);
+}
+.option-setting-status[data-state="speaking"],
+.option-setting-status[data-state="loading"] {
+  color: var(--crt-cyan);
+}
