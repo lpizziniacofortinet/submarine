@@ -20,6 +20,13 @@ test('localized hit damages only the selected compartment and creates flooding',
   assert.equal(dc.getSystemHealth('steering'), 60);
 });
 
+test('uncontrolled flooding increases slowly while pumps are secured', () => {
+  const dc = new window.DamageControlSystem();
+  dc.applyHit('engineering', 10, 20);
+  dc.update(10);
+  assert.equal(dc.compartments.engineering.floodingPct, 20.6);
+});
+
 test('dewatering reduces flooding but does not repair structural damage', () => {
   const dc = new window.DamageControlSystem();
   dc.applyHit('engineering', 35, 30);
