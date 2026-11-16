@@ -265,7 +265,7 @@ Use the simulator for experimentation and entertainment, not real-world navigati
 
 ## 15. Crew voice and audio controls
 
-Use the **SND** button to toggle procedural simulator sound effects and **VOX** to toggle spoken crew dispatches independently.
+Open **OPTIONS** from the command bar to configure audio and communications. Use **CREW VOICE COMMUNICATIONS** to enable or disable all spoken dispatches; the preference is saved in the current browser. The **VOX** button in the command bar remains available as a quick toggle. Use the **SND** button to toggle procedural simulator sound effects independently.
 
 - VOX uses the browser's Web Speech API and selects the best available English system voice, preferring an installed/local voice where the browser exposes that information.
 - Important operational events are spoken: alerts, selected sonar reports, and significant weapons events. Routine console log entries remain on screen only.
