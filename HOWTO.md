@@ -22,6 +22,7 @@ This guide explains the controls and the main gameplay loop. The simulator uses 
 12. [Keyboard shortcuts](#12-keyboard-shortcuts)
 13. [Damage control](#13-damage-control)
 14. [Model limitations](#14-model-limitations)
+15. [Crew voice and audio controls](#15-crew-voice-and-audio-controls)
 
 ---
 
@@ -260,3 +261,16 @@ The application is a hobby simulation with realistic presentation, not a certifi
 - Reactor, propulsion, sonar propagation, torpedo, and missile behavior are simplified gameplay models.
 
 Use the simulator for experimentation and entertainment, not real-world navigation, engineering, or tactical decisions.
+
+
+## 15. Crew voice and audio controls
+
+Use the **SND** button to toggle procedural simulator sound effects and **VOX** to toggle spoken crew dispatches independently.
+
+- VOX uses the browser's Web Speech API and selects the best available English system voice, preferring an installed/local voice where the browser exposes that information.
+- Important operational events are spoken: alerts, selected sonar reports, and significant weapons events. Routine console log entries remain on screen only.
+- Urgent alerts interrupt the current callout. Ordinary callouts are queued so they do not overlap.
+- Enabling VOX plays a short radio-check message. The opening/closing radio squelch is synthesized locally by the simulator's Web Audio engine.
+- Voice availability, accent, and naturalness depend on the browser and operating-system voice packs. Install an English voice in the OS settings for the best result.
+
+No external TTS service or API key is used. The radio squelch is an effect around the announcement; the browser-generated voice is not routed through a true narrowband radio filter. Some operating-system voice packs may need to be installed or downloaded separately.
