@@ -72,7 +72,7 @@ submarine/
 
 ---
 
-## Running Locally
+## Development Tests\n\nThe simulation clock unit tests run with Node.js (no dependencies):\n\n```bash\nnode --test tests/*.test.js\n```\n\n## Running Locally
 
 No build tools or external dependencies are required.
 
