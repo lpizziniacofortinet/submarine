@@ -265,7 +265,7 @@ Use the simulator for experimentation and entertainment, not real-world navigati
 
 ## 15. Crew voice and audio controls
 
-Crew communications use a separate local neural TTS process powered by HeadTTS and the Kokoro model. The simulator remains a browser application; the TTS server runs as a separate Node.js process on the same computer.
+Crew voice is an optional feature and is disabled by default. When explicitly enabled, it uses a separate local neural TTS process powered by HeadTTS and the Kokoro model. The simulator remains a browser application; the TTS server runs as a separate Node.js process on the same computer.
 
 ### Start the complete simulator
 
@@ -281,11 +281,11 @@ From the simulator project directory, run this single command:
 bash start-local.sh
 ```
 
-The script starts both the simulator HTTP server (`127.0.0.1:8080`) and the local HeadTTS/Kokoro server (`127.0.0.1:8882`), waits until both respond, then opens the simulator in your browser. Keep the terminal open while playing. Press **Ctrl+C** to stop the services that the launcher started; a pre-existing HeadTTS process is reused and is not stopped.
+By default, the script starts only the simulator HTTP server (`127.0.0.1:8080`) and opens it in your browser. It does not install, download, or start the voice engine. To opt in, run `bash start-local.sh --with-voice`; this also starts the local HeadTTS/Kokoro server (`127.0.0.1:8882`). Keep the terminal open while playing. Press **Ctrl+C** to stop the services that the launcher started; a pre-existing HeadTTS process is reused and is not stopped.
 
-Use `SIM_PORT=8090 bash start-local.sh` to select another HTTP port, or `bash start-local.sh --no-open` to keep the browser from opening automatically.
+Use `SIM_PORT=8090 bash start-local.sh` to select another HTTP port. Add `--with-voice` only when you want neural crew voices, or `--no-open` to keep the browser from opening automatically.
 
-The first launch clones HeadTTS into `~/.submarine-headtts`, installs dependencies, and downloads/caches model assets. This can take several minutes. Logs are written to `~/.submarine-simulator/logs/`.
+The first launch with `--with-voice` clones HeadTTS into `~/.submarine-headtts`, installs dependencies, and downloads/caches model assets. Logs are written to `~/.submarine-simulator/logs/`.
 
 For manual operation, the two processes can still be started separately with `python3 -m http.server 8080 --bind 127.0.0.1` and `node tts-server/start.mjs`.
 
@@ -293,7 +293,7 @@ The TTS launcher applies a local-only patch to the upstream server so its unauth
 ### Configure the crew
 
 Open **OPTIONS** from the command bar:
-- **CREW VOICE COMMUNICATIONS** enables/disables spoken callouts. The setting is saved in the current browser.
+- **CREW VOICE COMMUNICATIONS** enables/disables spoken callouts. It is off by default and the setting is saved in the current browser. Start the launcher with `--with-voice` before enabling it.
 - **CREW VOICE PROFILE** selects the neural voice. The bundled profiles are Fenrir (American male) and Bella (American female).
 - **VOICE TEST** generates and plays a radio check through the local Kokoro model.
 
