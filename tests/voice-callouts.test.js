@@ -48,7 +48,7 @@ test('significant weapons events are announced but unrelated messages are not', 
 test('radio formatting removes duplicate sonar prefix and expands common symbols', () => {
   assert.equal(
     VoiceEngine.formatRadioMessage('SONAR', 'CONN, SONAR! TORPEDO IN THE WATER! Bearing 123°!'),
-    'Sonar, Conn. TORPEDO IN THE WATER! Bearing 123 degrees !'
+    'Sonar, Conn. TORPEDO IN THE WATER! Bearing 123 degrees!'
   );
   assert.match(VoiceEngine.formatRadioMessage('WEPS', 'Tube 1 at <= 45m'), /at or below/);
 });
