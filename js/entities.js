@@ -560,11 +560,21 @@ class WeaponEntity {
         this.exploded = true;
         if (window.SubAudio) window.SubAudio.playExplosion(0.1);
         ownSub.hullIntegrityPct = Math.max(0, ownSub.hullIntegrityPct - 42);
+        const incomingBearing = window.Bathymetry.bearingDeg(ownSub.lat, ownSub.lon, this.lat, this.lon);
+        const relativeBearing = (incomingBearing - ownSub.heading + 360) % 360;
+        const hitZone = relativeBearing < 45 || relativeBearing >= 315
+          ? 'bow'
+          : relativeBearing < 135
+          ? 'operations'
+          : relativeBearing < 225
+          ? 'stern'
+          : 'engineering';
+        ownSub.damageControl.applyHit(hitZone, 42, 24);
         ownSub.addAcousticTransient(50);
         if (window.GameLogger) {
           window.GameLogger.log(
             'ENG',
-            `TORPEDO IMPACT! Hull integrity at ${Math.round(ownSub.hullIntegrityPct)}%! Shockwave in engine room!`,
+            `TORPEDO IMPACT! ${hitZone.toUpperCase()} COMPARTMENT HIT // Hull integrity ${Math.round(ownSub.hullIntegrityPct)}% // Flooding reported.`,
             'alert'
           );
         }
