@@ -21,6 +21,8 @@ class SubAudioEngine {
     this.volume = 0.75;
     this.initialized = false;
     this.alarmNodes = [];
+    this.sonarReverb = null;
+    this.sonarReverbGain = null;
 
     // Continuous nodes
     this.ambientGain = null;
@@ -66,6 +68,7 @@ class SubAudioEngine {
       this.masterGain.gain.value = this.enabled ? this.volume : 0;
       this.masterGain.connect(this.ctx.destination);
 
+      this.setupSonarReverb();
       this.setupContinuousLoops();
       this.initialized = true;
       this.playConsoleBeep(880, 0.06);
@@ -402,7 +405,123 @@ class SubAudioEngine {
   }
 
   /**
-   * AN/BQQ-10 3.5 kHz Active Sonar Ping + Metallic Reverb + Echo Returns
+   * Build a short, diffuse underwater impulse response. The convolver is
+   * shared by all sonar transmissions so each ping has a soft acoustic tail.
+   */
+  setupSonarReverb() {
+    try {
+      const sampleRate = this.ctx.sampleRate;
+      const durationSec = 2.6;
+      const length = Math.floor(sampleRate * durationSec);
+      const impulse = this.ctx.createBuffer(2, length, sampleRate);
+
+      for (let channel = 0; channel < 2; channel++) {
+        const data = impulse.getChannelData(channel);
+        for (let i = 0; i < length; i++) {
+          const progress = i / length;
+          const decay = Math.pow(1 - progress, 5.2);
+          data[i] = (Math.random() * 2 - 1) * decay * 0.16;
+        }
+      }
+
+      this.sonarReverb = this.ctx.createConvolver();
+      this.sonarReverb.buffer = impulse;
+      this.sonarReverbGain = this.ctx.createGain();
+      this.sonarReverbGain.gain.value = 0.22;
+      this.sonarReverb.connect(this.sonarReverbGain);
+      this.sonarReverbGain.connect(this.masterGain);
+    } catch (error) {
+      // Keep dry sonar audio available on browsers with limited Web Audio support.
+      this.sonarReverb = null;
+      this.sonarReverbGain = null;
+    }
+  }
+
+  /**
+   * AN/BQQ-10-style active sonar pulse: a sharp broadband onset followed by
+   * several damped resonant modes and a diffuse underwater reverberation.
+   */
+  scheduleSonarPulse(startTime, options = {}) {
+    const {
+      level = 1,
+      frequency = 3500,
+      tailSec = 1.55,
+      transient = true
+    } = options;
+    const ctx = this.ctx;
+    if (!ctx || level <= 0) return;
+
+    // The short broadband onset gives the transmission its characteristic
+    // hard "tock" instead of sounding like a continuous electronic beep.
+    if (transient) {
+      const durationSec = 0.026;
+      const length = Math.max(1, Math.floor(ctx.sampleRate * durationSec));
+      const buffer = ctx.createBuffer(1, length, ctx.sampleRate);
+      const samples = buffer.getChannelData(0);
+      for (let i = 0; i < length; i++) {
+        samples[i] = (Math.random() * 2 - 1) * (1 - i / length);
+      }
+
+      const noise = ctx.createBufferSource();
+      noise.buffer = buffer;
+      const bandpass = ctx.createBiquadFilter();
+      bandpass.type = 'bandpass';
+      bandpass.frequency.setValueAtTime(frequency, startTime);
+      bandpass.Q.value = 1.15;
+      const noiseGain = ctx.createGain();
+      noiseGain.gain.setValueAtTime(0.0001, startTime);
+      noiseGain.gain.linearRampToValueAtTime(0.12 * level, startTime + 0.0015);
+      noiseGain.gain.exponentialRampToValueAtTime(0.0001, startTime + durationSec);
+
+      noise.connect(bandpass);
+      bandpass.connect(noiseGain);
+      noiseGain.connect(this.masterGain);
+      if (this.sonarReverb) noiseGain.connect(this.sonarReverb);
+      noise.start(startTime);
+      noise.stop(startTime + durationSec + 0.002);
+    }
+
+    // A real transducer does not emit one perfectly clean sine wave. These
+    // slightly detuned resonances create the metallic, beating ring-down.
+    const modes = [
+      { ratio: 1.000, amplitude: 0.30, q: 3.8 },
+      { ratio: 0.503, amplitude: 0.105, q: 2.8 },
+      { ratio: 1.487, amplitude: 0.045, q: 5.2 },
+      { ratio: 1.006, amplitude: 0.075, q: 4.5 }
+    ];
+
+    for (const mode of modes) {
+      const osc = ctx.createOscillator();
+      const filter = ctx.createBiquadFilter();
+      const gain = ctx.createGain();
+      const modeFrequency = frequency * mode.ratio;
+
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(modeFrequency * 0.91, startTime);
+      osc.frequency.exponentialRampToValueAtTime(modeFrequency, startTime + 0.014);
+      osc.frequency.setValueAtTime(modeFrequency, startTime + 0.038);
+      osc.frequency.exponentialRampToValueAtTime(modeFrequency * 0.997, startTime + tailSec);
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(modeFrequency, startTime);
+      filter.Q.value = mode.q;
+
+      gain.gain.setValueAtTime(0.0001, startTime);
+      gain.gain.linearRampToValueAtTime(mode.amplitude * level, startTime + 0.002);
+      gain.gain.setValueAtTime(mode.amplitude * level * 0.72, startTime + 0.028);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startTime + tailSec);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(this.masterGain);
+      if (this.sonarReverb) gain.connect(this.sonarReverb);
+      osc.start(startTime);
+      osc.stop(startTime + tailSec + 0.02);
+    }
+  }
+
+  /**
+   * 3.5 kHz active sonar transmission with range-timed acoustic returns.
    */
   playActivePing(echoRangesNm = []) {
     if (!this.enabled) return;
@@ -410,75 +529,47 @@ class SubAudioEngine {
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
-
-    // Dual-oscillator metallic sonar chirp (3320Hz + 3550Hz)
-    const osc1 = this.ctx.createOscillator();
-    const osc2 = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-
-    osc1.type = 'sine';
-    osc2.type = 'sine';
-
-    osc1.frequency.setValueAtTime(3320, now);
-    osc1.frequency.setValueAtTime(3550, now + 0.14);
-
-    osc2.frequency.setValueAtTime(1660, now);
-    osc2.frequency.setValueAtTime(1775, now + 0.14);
-
-    gain.gain.setValueAtTime(0.32, now);
-    gain.gain.exponentialRampToValueAtTime(0.0008, now + 1.65);
-
-    osc1.connect(gain);
-    osc2.connect(gain);
-    gain.connect(this.masterGain);
-
-    osc1.start(now);
-    osc2.start(now);
-    osc1.stop(now + 1.7);
-    osc2.stop(now + 1.7);
-
-    // Returning target echoes delayed by distance
-    echoRangesNm.slice(0, 5).forEach((rngNm) => {
-      const delaySec = Math.min(3.6, Math.max(0.55, rngNm * 0.30));
-      const echoOsc = this.ctx.createOscillator();
-      const echoGain = this.ctx.createGain();
-      echoOsc.type = 'sine';
-      echoOsc.frequency.setValueAtTime(3565, now + delaySec);
-
-      const atten = Math.max(0.025, 0.18 / (1 + rngNm * 0.3));
-      echoGain.gain.setValueAtTime(atten, now + delaySec);
-      echoGain.gain.exponentialRampToValueAtTime(0.0005, now + delaySec + 0.75);
-
-      echoOsc.connect(echoGain);
-      echoGain.connect(this.masterGain);
-      echoOsc.start(now + delaySec);
-      echoOsc.stop(now + delaySec + 0.8);
+    this.scheduleSonarPulse(now, {
+      level: 1,
+      frequency: 3500,
+      tailSec: 1.6,
+      transient: true
     });
+
+    // Round-trip propagation at approximately 1500 m/s:
+    // 2 x 1852 metres per nautical mile.
+    echoRangesNm
+      .filter((range) => Number.isFinite(range) && range >= 0)
+      .sort((a, b) => a - b)
+      .slice(0, 5)
+      .forEach((rangeNm) => {
+        const delaySec = (rangeNm * 2 * 1852) / 1500;
+        const attenuation = Math.max(0.006, 0.15 / Math.pow(1 + rangeNm * 0.42, 1.45));
+        this.scheduleSonarPulse(now + delaySec, {
+          level: attenuation,
+          frequency: 3480 - Math.min(180, rangeNm * 4),
+          tailSec: 1.25,
+          transient: false
+        });
+      });
   }
 
   /**
-   * Hostile Warship / Submarine Active Sonar Ping Striking Our Hull
+   * Incoming hostile sonar ping: slightly higher, sharper and quieter,
+   * with its apparent strength scaled by received signal-to-noise ratio.
    */
   playHostilePing(snrDb = 20) {
     if (!this.enabled) return;
     this.init();
     if (!this.ctx) return;
 
-    const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sine';
-    osc.frequency.setValueAtTime(4380, now);
-    osc.frequency.setValueAtTime(4650, now + 0.11);
-
-    const vol = Math.min(0.30, Math.max(0.05, snrDb * 0.008));
-    gain.gain.setValueAtTime(vol, now);
-    gain.gain.exponentialRampToValueAtTime(0.0008, now + 1.15);
-
-    osc.connect(gain);
-    gain.connect(this.masterGain);
-    osc.start(now);
-    osc.stop(now + 1.2);
+    const level = Math.min(0.82, Math.max(0.16, snrDb * 0.025));
+    this.scheduleSonarPulse(this.ctx.currentTime, {
+      level,
+      frequency: 4520,
+      tailSec: 1.2,
+      transient: true
+    });
   }
 
   /**
