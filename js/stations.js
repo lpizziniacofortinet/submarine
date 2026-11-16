@@ -27,6 +27,9 @@ class StationRenderers {
     this.scopeBearing = 90;
     this.scopeThermal = false;
     this.scopeZoom = 1.5;
+    this.coastlineModel = window.CoastlineModel ? new window.CoastlineModel() : null;
+    this.scopeVisibilityKm = 45;
+
 
     // Radar sweep angle
     this.radarSweepDeg = 0;
@@ -996,6 +999,14 @@ class StationRenderers {
       const w = displayW;
       const h = displayH;
       const sub = world.ownSub;
+      if (this.coastlineModel) this.coastlineModel.updatePosition(sub.lat, sub.lon);
+      const terrainProfile = this.coastlineModel ? this.coastlineModel.profile : null;
+      const terrainStatus = this.coastlineModel ? this.coastlineModel.status : 'UNAVAILABLE';
+      const terrainStatusEl = document.getElementById('scope-terrain-status');
+      if (terrainStatusEl) {
+        terrainStatusEl.textContent = 'TERRAIN DATA: ' + terrainStatus;
+        terrainStatusEl.dataset.state = String(terrainStatus).toLowerCase();
+      }
       const raised = Boolean(sub.periscopeRaised && sub.depthM <= 20.5);
       const thermal = Boolean(this.scopeThermal);
       const liveMark = scopeCanvas.parentElement?.querySelector('.scope-live-mark');
@@ -1140,6 +1151,53 @@ class StationRenderers {
         sea.addColorStop(1, seaBottom);
         ctx.fillStyle = sea;
         ctx.fillRect(0, horizonY, w, h - horizonY);
+
+        // Geographic coastline silhouette from the local Copernicus DEM profile.
+        // The DEM rays already include Earth curvature and a modest standard
+        // optical refraction correction; the 2D renderer only projects the skyline.
+        if (terrainProfile && terrainProfile.rays && terrainProfile.rays.length) {
+          const seaHorizon = terrainProfile.seaHorizonAngleDeg;
+          const verticalScale = 24;
+          const sampleCount = Math.max(100, Math.ceil(w / 4));
+          const skyline = [];
+          for (let i = 0; i <= sampleCount; i++) {
+            const x = (i / sampleCount) * w;
+            const relativeBearing = ((i / sampleCount) - 0.5) * fovDeg;
+            const bearing = (this.scopeBearing + relativeBearing + 360) % 360;
+            const ray = window.CoastlineModel.sample(terrainProfile, bearing);
+            const landRise = ray && ray.hasLand ? Math.max(0, ray.angleDeg - seaHorizon) : 0;
+            const y = horizonY - Math.min(h * 0.34, landRise * verticalScale);
+            skyline.push({ x, y, rangeKm: ray && ray.hasLand ? ray.rangeKm : 0, hasLand: Boolean(ray && ray.hasLand) });
+          }
+
+          for (let i = 0; i < skyline.length - 1; i++) {
+            const a = skyline[i];
+            const b = skyline[i + 1];
+            if (!a.hasLand && !b.hasLand) continue;
+            const rangeKm = (a.rangeKm + b.rangeKm) * 0.5;
+            const haze = clamp(1 - Math.max(0, rangeKm - 8) / (this.scopeVisibilityKm * 1.35), 0.18, 0.88);
+            const base = thermal ? [35, 48, 54] : [29, 48, 59];
+            const fog = thermal ? [150, 163, 164] : [127, 151, 159];
+            const mix = clamp(1 - haze, 0, 1);
+            const color = base.map((value, channel) => Math.round(value * haze + fog[channel] * mix));
+            ctx.fillStyle = 'rgba(' + color.join(',') + ',0.96)';
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.lineTo(b.x, horizonY + 18);
+            ctx.lineTo(a.x, horizonY + 18);
+            ctx.closePath();
+            ctx.fill();
+
+            ctx.strokeStyle = thermal ? 'rgba(220, 229, 223,' + (0.42 * haze + 0.12) + ')' :
+              'rgba(205, 222, 226,' + (0.45 * haze + 0.10) + ')';
+            ctx.lineWidth = 1.1;
+            ctx.beginPath();
+            ctx.moveTo(a.x, a.y);
+            ctx.lineTo(b.x, b.y);
+            ctx.stroke();
+          }
+        }
 
         const wavePhase = simSeconds * 0.85;
         for (let i = 0; i < 15; i++) {
@@ -1326,6 +1384,7 @@ class StationRenderers {
         drawText('MAST  EXTENDED', 14, h - 14, 9, '#a9d4c9', 700);
         drawText(`DEPTH ${sub.depthM.toFixed(1)} m`, w * 0.36, h - 14, 9, '#c5d4dc', 600, 'center');
         drawText(`OWN HDG ${String(Math.round(sub.heading || 0)).padStart(3, '0')}°`, w * 0.64, h - 14, 9, '#c5d4dc', 600, 'center');
+        drawText('VIS ' + this.scopeVisibilityKm + ' KM', w * 0.84, h - 14, 9, '#a9bfcb', 600, 'center');
         drawText(thermal ? 'IR SENSOR' : 'OPTICAL SENSOR', w - 14, h - 14, 9, '#e4c58f', 700, 'right');
         drawCornerFrame('rgba(201, 220, 231, 0.52)');
       }
