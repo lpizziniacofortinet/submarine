@@ -45,10 +45,12 @@ class DamageControlSystem {
   }
 
   update(dt) {
-    if (!this.pumping || dt <= 0) return;
-    // Dewatering reduces flooding; it cannot repair structural damage.
+    if (dt <= 0) return;
+    // Uncontrolled flooding grows slowly; dewatering outpaces the leak.
     for (const compartment of Object.values(this.compartments)) {
-      compartment.floodingPct = this.clamp(compartment.floodingPct - 0.35 * dt);
+      if (compartment.floodingPct <= 0) continue;
+      const rate = this.pumping ? -0.35 : 0.06;
+      compartment.floodingPct = this.clamp(compartment.floodingPct + rate * dt);
     }
   }
 
@@ -73,7 +75,7 @@ class DamageControlSystem {
   }
 
   get floodingWeightTons() {
-    return Object.values(this.compartments).reduce((sum, c) => sum + c.floodingPct, 0) * 0.08;
+    return Object.values(this.compartments).reduce((sum, c) => sum + c.floodingPct, 0) * 0.45;
   }
 
   serialize() {
