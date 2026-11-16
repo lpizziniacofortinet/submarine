@@ -51,6 +51,8 @@ class SubAudioEngine {
     this.voiceRate = 0.94;
     this.voicePitch = 0.82;
     this.voiceLevel = 0.92;
+    this.lastVoiceError = null;
+    this.onVoiceStatus = null;
     try {
       this.voiceEnabled = this.speechSupported &&
         window.localStorage?.getItem('ssn774_voice_enabled') !== 'false';
@@ -144,9 +146,12 @@ class SubAudioEngine {
       return value;
     };
 
-    this.preferredVoice = this.availableVoices
+    const englishVoices = this.availableVoices
       .filter((voice) => String(voice.lang || '').toLowerCase().startsWith('en'))
-      .sort((a, b) => score(b) - score(a))[0] || null;
+      .sort((a, b) => score(b) - score(a));
+    this.preferredVoice = englishVoices[0] ||
+      this.availableVoices.find((voice) => voice.default) ||
+      this.availableVoices[0] || null;
     return this.availableVoices;
   }
 
@@ -203,6 +208,9 @@ class SubAudioEngine {
       this.voiceSpeaking = false;
       this.currentUtterance = null;
       this.speechSynthesis.cancel();
+      this.notifyVoiceStatus('off', 'Crew voice communications disabled');
+    } else {
+      this.notifyVoiceStatus('ready', 'Crew voice enabled; click VOX TEST to verify playback');
     }
     return this.voiceEnabled;
   }
@@ -242,39 +250,116 @@ class SubAudioEngine {
     source.stop(now + duration + 0.005);
   }
 
-  processVoiceQueue() {
-    if (!this.voiceEnabled || !this.speechSupported || this.voiceSpeaking || !this.voiceQueue.length) return;
+  notifyVoiceStatus(state, detail = '') {
+    if (typeof this.onVoiceStatus === 'function') {
+      this.onVoiceStatus(state, detail);
+    }
+  }
 
-    const item = this.voiceQueue.shift();
-    const generation = this.voiceGeneration;
-    const utterance = new window.SpeechSynthesisUtterance(item.text);
+  createVoiceUtterance(text) {
+    const utterance = new window.SpeechSynthesisUtterance(text);
     utterance.lang = 'en-US';
     utterance.rate = this.voiceRate;
     utterance.pitch = this.voicePitch;
     utterance.volume = this.voiceLevel;
     if (this.preferredVoice) utterance.voice = this.preferredVoice;
+    return utterance;
+  }
 
-    const finish = () => {
+  processVoiceQueue() {
+    if (!this.voiceEnabled || !this.speechSupported || this.voiceSpeaking || !this.voiceQueue.length) return;
+
+    const item = this.voiceQueue.shift();
+    const generation = this.voiceGeneration;
+    const utterance = this.createVoiceUtterance(item.text);
+
+    const finish = (state = 'ready', detail = '') => {
       if (generation !== this.voiceGeneration) return;
       this.voiceSpeaking = false;
       this.currentUtterance = null;
+      this.notifyVoiceStatus(state, detail);
       this.playRadioSquelch(false);
       this.processVoiceQueue();
     };
-    utterance.onend = finish;
-    utterance.onerror = finish;
+    utterance.onstart = () => this.notifyVoiceStatus('speaking', 'Crew voice transmitting');
+    utterance.onend = () => finish('ready', 'Crew voice ready');
+    utterance.onerror = (event) => {
+      this.lastVoiceError = event.error || 'speech-error';
+      finish('error', `Speech synthesis error: ${this.lastVoiceError}`);
+    };
 
     this.voiceSpeaking = true;
     this.currentUtterance = utterance;
     this.playRadioSquelch(true);
-    window.setTimeout(() => {
-      if (generation !== this.voiceGeneration || !this.voiceEnabled) return;
-      try {
-        this.speechSynthesis.speak(utterance);
-      } catch (e) {
-        finish();
-      }
-    }, 75);
+    try {
+      if (this.speechSynthesis.paused) this.speechSynthesis.resume();
+      // Speak immediately. Do not defer this call: browsers may require a
+      // recent user gesture to start speech synthesis.
+      this.speechSynthesis.speak(utterance);
+    } catch (error) {
+      this.lastVoiceError = error?.message || String(error);
+      finish('error', `Unable to start speech synthesis: ${this.lastVoiceError}`);
+    }
+  }
+
+  /**
+   * Direct playback probe intended for a real button click. This bypasses the
+   * queue so browser gesture restrictions cannot be lost to timers.
+   */
+  testVoice() {
+    if (!this.speechSupported) {
+      this.notifyVoiceStatus('unsupported', 'Speech synthesis is unavailable in this browser');
+      return false;
+    }
+    if (!this.voiceEnabled) {
+      this.notifyVoiceStatus('off', 'Enable VOX before running the voice test');
+      return false;
+    }
+
+    this.refreshVoices();
+    this.voiceGeneration++;
+    this.voiceQueue.length = 0;
+    this.voiceSpeaking = false;
+    this.currentUtterance = null;
+    this.speechSynthesis.cancel();
+
+    const message = 'Conn. Radio check. This is USS Virginia. Crew voice communications are operational. How copy?';
+    const utterance = this.createVoiceUtterance(message);
+    const generation = this.voiceGeneration;
+
+    utterance.onstart = () => this.notifyVoiceStatus('speaking', 'Radio check transmitting');
+    utterance.onend = () => {
+      if (generation !== this.voiceGeneration) return;
+      this.voiceSpeaking = false;
+      this.currentUtterance = null;
+      this.notifyVoiceStatus('ready', 'Radio check complete');
+      this.playRadioSquelch(false);
+    };
+    utterance.onerror = (event) => {
+      if (generation !== this.voiceGeneration) return;
+      this.voiceSpeaking = false;
+      this.currentUtterance = null;
+      this.lastVoiceError = event.error || 'speech-error';
+      this.notifyVoiceStatus('error', `Speech synthesis error: ${this.lastVoiceError}`);
+      this.playRadioSquelch(false);
+    };
+
+    this.voiceSpeaking = true;
+    this.currentUtterance = utterance;
+    this.playRadioSquelch(true);
+    try {
+      if (this.speechSynthesis.paused) this.speechSynthesis.resume();
+      // This method is called synchronously by the VOX TEST click handler.
+      this.speechSynthesis.speak(utterance);
+      this.notifyVoiceStatus('speaking', 'Radio check sent to the browser speech engine');
+      return true;
+    } catch (error) {
+      this.voiceSpeaking = false;
+      this.currentUtterance = null;
+      this.lastVoiceError = error?.message || String(error);
+      this.notifyVoiceStatus('error', `Unable to start speech synthesis: ${this.lastVoiceError}`);
+      return false;
+    }
   }
 
   /**

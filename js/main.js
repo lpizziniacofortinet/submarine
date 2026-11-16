@@ -1280,21 +1280,76 @@ class SubmarineWorld {
     });
 
     const voiceBtn = document.getElementById('btn-voice-toggle');
-    if (voiceBtn) {
-      const voiceAvailable = window.SubAudio.speechSupported;
-      voiceBtn.disabled = !voiceAvailable;
-      const paintVoiceButton = (on) => {
+    const voiceTestBtn = document.getElementById('btn-voice-test');
+    const voiceOptionCheckbox = document.getElementById('opt-crew-voice-enabled');
+    const voiceOptionStatus = document.getElementById('opt-crew-voice-status');
+    const voiceAvailable = window.SubAudio.speechSupported;
+
+    const syncVoiceControls = (on) => {
+      if (voiceBtn) {
         voiceBtn.textContent = voiceAvailable ? (on ? 'VOX:ON' : 'VOX:OFF') : 'VOX:N/A';
         voiceBtn.classList.toggle('active', Boolean(on));
+        voiceBtn.disabled = !voiceAvailable;
         voiceBtn.title = voiceAvailable
-          ? 'Toggle local crew voice communications (Web Speech API)'
+          ? 'Toggle local neural crew voice communications (Kokoro TTS)'
           : 'Speech synthesis is not available in this browser';
-      };
-      paintVoiceButton(window.SubAudio.voiceEnabled);
+      }
+      if (voiceOptionCheckbox) {
+        voiceOptionCheckbox.checked = Boolean(on);
+        voiceOptionCheckbox.disabled = !voiceAvailable;
+      }
+      if (voiceOptionStatus) {
+        voiceOptionStatus.textContent = !voiceAvailable
+          ? 'Speech synthesis is unavailable in this browser.'
+          : (on ? 'Voice communications enabled.' : 'Voice communications disabled.');
+      }
+    };
+
+    syncVoiceControls(window.SubAudio.voiceEnabled);
+    window.SubAudio.onVoiceStatus = (state, detail) => {
+      if (voiceBtn && detail) voiceBtn.title = detail;
+      if (voiceTestBtn && state === 'error') {
+        voiceTestBtn.textContent = 'VOICE ERR';
+        voiceTestBtn.title = detail;
+      } else if (voiceTestBtn && (state === 'ready' || state === 'off')) {
+        voiceTestBtn.textContent = 'VOICE TEST';
+        voiceTestBtn.title = detail || 'Test local crew voice playback';
+      }
+      if (voiceOptionStatus && detail) voiceOptionStatus.textContent = detail;
+      if (voiceOptionStatus) voiceOptionStatus.dataset.state = state;
+    };
+
+    if (voiceBtn) {
       voiceBtn.addEventListener('click', () => {
-        const on = window.SubAudio.toggleVoice();
-        paintVoiceButton(on);
-        if (on) window.SubAudio.speak('Conn, radio check. How copy?', true);
+        syncVoiceControls(window.SubAudio.toggleVoice());
+      });
+    }
+    if (voiceOptionCheckbox) {
+      voiceOptionCheckbox.addEventListener('change', (e) => {
+        syncVoiceControls(window.SubAudio.setVoiceEnabled(e.target.checked));
+      });
+    }
+    if (voiceTestBtn) {
+      voiceTestBtn.disabled = !voiceAvailable;
+      voiceTestBtn.addEventListener('click', () => {
+        const started = window.SubAudio.testVoice();
+        if (!started) voiceTestBtn.title = 'Voice test could not start. Check browser speech settings.';
+      });
+    }
+
+    const optionsModal = document.getElementById('options-modal');
+    const openOptionsBtn = document.getElementById('btn-open-options');
+    const closeOptionsBtn = document.getElementById('btn-close-options');
+    if (openOptionsBtn && optionsModal) {
+      openOptionsBtn.addEventListener('click', () => {
+        syncVoiceControls(window.SubAudio.voiceEnabled);
+        optionsModal.style.display = 'flex';
+      });
+    }
+    if (closeOptionsBtn && optionsModal) {
+      closeOptionsBtn.addEventListener('click', () => { optionsModal.style.display = 'none'; });
+      optionsModal.addEventListener('click', (e) => {
+        if (e.target === optionsModal) optionsModal.style.display = 'none';
       });
     }
 
@@ -1705,6 +1760,11 @@ class SubmarineWorld {
 
     // Global Keyboard Shortcuts
     window.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        modal.style.display = 'none';
+        if (optionsModal) optionsModal.style.display = 'none';
+        return;
+      }
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
       if (e.key === 'F1') { e.preventDefault(); this.switchStation('tactical'); }
       if (e.key === 'F2') { e.preventDefault(); this.switchStation('sonar'); }
@@ -1713,7 +1773,6 @@ class SubmarineWorld {
       if (e.key === 'F5') { e.preventDefault(); this.switchStation('reactor'); }
       if (e.key === 'F6') { e.preventDefault(); this.switchStation('periscope'); }
       if (e.key === 'F7') { e.preventDefault(); this.switchStation('damage-control'); }
-      if (e.key === 'Escape') { modal.style.display = 'none'; }
       if (e.key === 'a' || e.key === 'A') applyOrderHdg(this.ownSub.orderedHeading - 5);
       if (e.key === 'd' || e.key === 'D') applyOrderHdg(this.ownSub.orderedHeading + 5);
       if (e.key === 'w' || e.key === 'W') applyOrderDepth(this.ownSub.orderedDepthM - 10);

@@ -89,7 +89,9 @@
             <button class="mil-btn" id="btn-time-5x" title="5x Time Compression">5X</button>
             <button class="mil-btn" id="btn-time-10x" title="10x Time Compression">10X</button>
             <button class="mil-btn amber active" id="btn-audio-toggle" title="Toggle WebAudio Sound Effects">SND:ON</button>
-            <button class="mil-btn active" id="btn-voice-toggle" title="Toggle local crew voice communications">VOX:ON</button>
+            <button class="mil-btn" id="btn-voice-toggle" title="Toggle local crew voice communications">VOX:OFF</button>
+            <button class="mil-btn" id="btn-voice-test" title="Play a local crew voice test">VOICE TEST</button>
+            <button class="mil-btn" id="btn-open-options" title="Open simulator options">OPTIONS</button>
           </div>
         </div>
       </div>
@@ -832,11 +834,48 @@
     </div>
   </div>
 
+  <!-- SIMULATOR OPTIONS -->
+  <div id="options-modal" class="modal-backdrop" style="display:none;">
+    <div class="modal-window options-window">
+      <div class="panel-header" style="font-size:13px; padding:6px;">
+        <span>SIMULATOR OPTIONS // AUDIO &amp; COMMUNICATIONS</span>
+        <button class="mil-btn" id="btn-close-options">CLOSE OPTIONS</button>
+      </div>
+      <div class="modal-body">
+        <div class="options-section">
+          <div class="panel-header"><span>CREW COMMUNICATIONS</span></div>
+          <label class="option-setting-row" for="opt-crew-voice-enabled">
+            <span>
+              <strong>CREW VOICE COMMUNICATIONS</strong>
+              <small>Enable spoken sonar, weapons, command and emergency callouts.</small>
+            </span>
+            <input type="checkbox" id="opt-crew-voice-enabled">
+          </label>
+          <div class="option-setting-row">
+            <span>
+              <strong>CREW VOICE PROFILE</strong>
+              <small>Choose the neural Kokoro voice used for crew callouts.</small>
+            </span>
+            <select id="opt-crew-voice-profile" class="mil-select" aria-label="Crew voice profile">
+              <option value="am_fenrir">FENRIR — US MALE</option>
+              <option value="af_bella">BELLA — US FEMALE</option>
+            </select>
+          </div>
+          <div id="opt-crew-voice-status" class="option-setting-status" role="status" aria-live="polite">
+            Crew voice communications are disabled by default.
+          </div>
+          <p class="option-note">Crew voice is optional and disabled by default. Start the simulator with --with-voice to launch the local HeadTTS/Kokoro server, then enable VOX here. No audio is sent to a cloud TTS provider. Procedural sound effects (SND) remain independent from VOX.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Leaflet JS -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 
   <!-- Simulation Modules -->
   <script src="js/audio.js"></script>
+  <script src="js/local-tts.js"></script>
   <script src="js/bathymetry.js"></script>
   <script src="js/reactor.js"></script>
   <script src="js/damage-control.js"></script>
