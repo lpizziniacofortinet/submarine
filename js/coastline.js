@@ -148,8 +148,10 @@
       this.loadingKey = key;
       this.status = 'LOADING';
       this.loadProfile(lat, lon, key).catch((error) => {
-        this.error = error;
-        this.status = 'OFFLINE';
+        if (this.requestedKey === key) {
+          this.error = error;
+          this.status = 'OFFLINE';
+        }
       }).finally(() => {
         if (this.loadingKey === key) this.loadingKey = null;
       });
@@ -219,10 +221,8 @@
         sampledAt: Date.now()
       };
 
-      this.profile = profile;
-      this.status = 'READY';
-      this.error = null;
-
+      // Cache completed lookups even when the submarine has moved on, but
+      // never let an older asynchronous request replace the current position.
       try {
         if (root.localStorage) {
           root.localStorage.setItem(CACHE_PREFIX + key, JSON.stringify({
@@ -232,6 +232,12 @@
         }
       } catch (_) {
         // Storage quota and privacy settings must not break the periscope display.
+      }
+
+      if (this.requestedKey === key) {
+        this.profile = profile;
+        this.status = 'READY';
+        this.error = null;
       }
       return profile;
     }
