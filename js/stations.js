@@ -998,6 +998,11 @@ class StationRenderers {
       const sub = world.ownSub;
       const raised = Boolean(sub.periscopeRaised && sub.depthM <= 20.5);
       const thermal = Boolean(this.scopeThermal);
+      const liveMark = scopeCanvas.parentElement?.querySelector('.scope-live-mark');
+      if (liveMark) {
+        liveMark.style.display = raised ? 'flex' : 'none';
+        liveMark.lastChild.textContent = thermal ? ' FLIR SENSOR' : ' EO SENSOR';
+      }
       const zoom = this.scopeZoom || 1.5;
       const clamp = (value, min, max) => Math.max(min, Math.min(max, value));
       const simSeconds = Number.isFinite(world.simTimeSec) ? world.simTimeSec : 0;
