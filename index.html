@@ -91,6 +91,7 @@
             <button class="mil-btn amber active" id="btn-audio-toggle" title="Toggle WebAudio Sound Effects">SND:ON</button>
             <button class="mil-btn active" id="btn-voice-toggle" title="Toggle local crew voice communications">VOX:ON</button>
             <button class="mil-btn" id="btn-voice-test" title="Play a local crew voice test">VOICE TEST</button>
+            <button class="mil-btn" id="btn-open-options" title="Open simulator options">OPTIONS</button>
           </div>
         </div>
       </div>
@@ -828,6 +829,32 @@
             <p><strong style="color:var(--crt-cyan)">2. MEDITERRANEAN THERMOCLINE &amp; S9G PWR:</strong></p>
             <p>Warm Mediterranean surface water sits over cooler Levantine Intermediate Water across a sharp <strong>Thermocline (~88m)</strong>. Hiding below the layer provides a <strong>-14 dB acoustic shadow</strong> against surface warships. Use <strong>Natural Circulation</strong> coolant pumps for silent stalking.</p>
           </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- SIMULATOR OPTIONS -->
+  <div id="options-modal" class="modal-backdrop" style="display:none;">
+    <div class="modal-window options-window">
+      <div class="panel-header" style="font-size:13px; padding:6px;">
+        <span>SIMULATOR OPTIONS // AUDIO &amp; COMMUNICATIONS</span>
+        <button class="mil-btn" id="btn-close-options">CLOSE OPTIONS</button>
+      </div>
+      <div class="modal-body">
+        <div class="options-section">
+          <div class="panel-header"><span>CREW COMMUNICATIONS</span></div>
+          <label class="option-setting-row" for="opt-crew-voice-enabled">
+            <span>
+              <strong>CREW VOICE COMMUNICATIONS</strong>
+              <small>Enable spoken sonar, weapons, command and emergency callouts.</small>
+            </span>
+            <input type="checkbox" id="opt-crew-voice-enabled" checked>
+          </label>
+          <div id="opt-crew-voice-status" class="option-setting-status" role="status" aria-live="polite">
+            Voice communications enabled.
+          </div>
+          <p class="option-note">This setting is saved in this browser and is independent from procedural sound effects (SND). You can also use the VOX quick toggle in the command bar.</p>
         </div>
       </div>
     </div>
