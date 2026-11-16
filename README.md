@@ -29,7 +29,7 @@ The project is built with HTML5, CSS, Canvas, and vanilla JavaScript. It has no 
 
 ### Persistence and simulation controls
 - Fixed-step simulation clock.
-- Selective local crew voice callouts via the browser/OS Web Speech API, with radio squelch effects and no external API key.
+- Selective local crew voice callouts via the browser/OS Web Speech API, with radio squelch effects, a persistent OPTIONS preference, and no external API key.
 - F7 damage-control station with a live longitudinal compartment diagram.
 - 1x, 2x, 5x, and 10x time-compression controls.
 - Browser local-storage autosave and manual save/resume.
