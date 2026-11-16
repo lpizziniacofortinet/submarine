@@ -164,14 +164,14 @@ class SubAudioEngine {
   static formatRadioMessage(station, message) {
     let body = String(message || '')
       .replace(/<[^>]*>/g, ' ')
-      .replace(/^\\s*Conn,\\s*Sonar[.!:,]?\\s*/i, '')
-      .replace(/\\s+/g, ' ')
+      .replace(/^\s*Conn,\s*Sonar[.!:,]?\s*/i, '')
+      .replace(/\s+/g, ' ')
       .trim()
       .replace(/<=/g, ' at or below ')
       .replace(/>=/g, ' at or above ')
       .replace(/°/g, ' degrees ')
-      .replace(/\\bKT\\b/gi, ' knots ')
-      .replace(/\\s+/g, ' ');
+      .replace(/\bKT\b/gi, ' knots ')
+      .replace(/\s+/g, ' ');
     const callsign = station === 'SONAR' ? 'Sonar, Conn.' :
       station === 'WEPS' ? 'Weapons, Conn.' :
       station === 'ENG' ? 'Engineering, Conn.' : 'Conn.';
@@ -282,7 +282,7 @@ class SubAudioEngine {
    */
   speak(text, urgent = false) {
     if (!this.voiceEnabled || !this.speechSupported || !text) return false;
-    const cleanText = String(text).replace(/\\s+/g, ' ').trim().slice(0, 260);
+    const cleanText = String(text).replace(/\s+/g, ' ').trim().slice(0, 260);
     if (!cleanText) return false;
 
     if (urgent) {
