@@ -68,7 +68,7 @@ On Windows, you can also use:
 py -m http.server 8080
 ```
 
-Opening `index.html` directly may work, but serving the files over HTTP is recommended for browser API and asset compatibility.
+Opening `index.html` directly may work, but serving the files over HTTP is recommended for browser API and asset compatibility. For local neural voices, use this local HTTP address on the same computer rather than relying on a remotely hosted copy of the simulator; browser local-network protections can restrict remote pages from reaching loopback services.
 
 An internet connection is required for third-party map tiles and the optional online elevation request. Core simulation logic runs locally; map layers and online probes may be unavailable offline.
 
@@ -110,15 +110,11 @@ submarine/
 ├── tts-server/
 │   ├── headtts-node.json       # Local Kokoro REST server configuration
 │   └── start.mjs               # Installs and starts the separate local TTS process
-├── tts-server/
-│   ├── headtts-node.json       # Local Kokoro REST server configuration
-│   └── start.mjs               # Installs and starts the separate local TTS process
 ├── tests/
 │   ├── simulation-clock.test.js
 │   ├── damage-control.test.js
 │   └── voice-callouts.test.js
 └── js/
-    ├── local-tts.js            # Local Kokoro client and radio audio chain
     ├── local-tts.js            # Local Kokoro client and radio audio chain
     ├── simulation-clock.js     # Fixed-step simulation clock
     ├── audio.js                # Procedural Web Audio effects
