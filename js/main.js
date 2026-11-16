@@ -30,6 +30,7 @@ class CombatLogger {
     }
 
     this.showPopup(station, message, cssClass, timeStr);
+    if (window.SubAudio) window.SubAudio.announce(station, message, cssClass);
   }
 
   showPopup(station, message, cssClass = 'conn', timeStr = '') {
@@ -544,7 +545,6 @@ class SubmarineWorld {
     this.ownSub.addAcousticTransient(12);
     if (window.SubAudio) {
       window.SubAudio.playPneumaticHiss(0.8);
-      window.SubAudio.speak(`Flooding Tube ${tubeIndex}.`);
     }
     window.GameLogger.log('WEPS', `Flooding Torpedo Tube ${tubeIndex} and opening outer shutter door...`, 'weps');
     this.renderTubesUI();
@@ -591,7 +591,6 @@ class SubmarineWorld {
     this.ownSub.addAcousticTransient(32);
     if (window.SubAudio) {
       window.SubAudio.playTubeLaunch();
-      window.SubAudio.speak(`Tube ${tubeIndex} fired! Unit running normal, wire guidance online.`);
     }
 
     if (this.torpedoMagazine > 0) {
@@ -654,7 +653,6 @@ class SubmarineWorld {
     this.ownSub.addAcousticTransient(40);
     if (window.SubAudio) {
       window.SubAudio.playMissileLaunch();
-      window.SubAudio.speak(`VLS Tube ${vlsIndex} away! Missile broached and tracking.`);
     }
 
     window.GameLogger.log(
@@ -691,7 +689,6 @@ class SubmarineWorld {
     this.weapons.push(torp);
     if (window.SubAudio) {
       window.SubAudio.playAlarm('TORPEDO');
-      window.SubAudio.speak(`Conn, Sonar! Torpedo in the water! Bearing ${Math.round((bearingToPlayer + 180) % 360)}!`, true);
     }
     window.GameLogger.log(
       'SONAR',
@@ -1282,6 +1279,25 @@ class SubmarineWorld {
       e.target.classList.toggle('active', on);
     });
 
+    const voiceBtn = document.getElementById('btn-voice-toggle');
+    if (voiceBtn) {
+      const voiceAvailable = window.SubAudio.speechSupported;
+      voiceBtn.disabled = !voiceAvailable;
+      const paintVoiceButton = (on) => {
+        voiceBtn.textContent = voiceAvailable ? (on ? 'VOX:ON' : 'VOX:OFF') : 'VOX:N/A';
+        voiceBtn.classList.toggle('active', Boolean(on));
+        voiceBtn.title = voiceAvailable
+          ? 'Toggle local crew voice communications (Web Speech API)'
+          : 'Speech synthesis is not available in this browser';
+      };
+      paintVoiceButton(window.SubAudio.voiceEnabled);
+      voiceBtn.addEventListener('click', () => {
+        const on = window.SubAudio.toggleVoice();
+        paintVoiceButton(on);
+        if (on) window.SubAudio.speak('Conn, radio check. How copy?', true);
+      });
+    }
+
     // Play crisp 90s CRT console beep on any button or tab click
     document.addEventListener('click', (e) => {
       if (e.target.closest('.mil-btn') || e.target.closest('.station-tab')) {
@@ -1515,7 +1531,6 @@ class SubmarineWorld {
       if (window.SubAudio) {
         window.SubAudio.playAlarm('TORPEDO');
         window.SubAudio.playPneumaticHiss(2.5);
-        window.SubAudio.speak('Emergency Main Ballast Tank Blow! Surface, Surface, Surface!', true);
       }
       window.GameLogger.log('CONN', 'EMERGENCY MAIN BALLAST TANK BLOW! Dumping 4500 PSI High-Pressure Air to surface!', 'alert');
     });
