@@ -265,12 +265,37 @@ Use the simulator for experimentation and entertainment, not real-world navigati
 
 ## 15. Crew voice and audio controls
 
-Open **OPTIONS** from the command bar to configure audio and communications. Use **CREW VOICE COMMUNICATIONS** to enable or disable all spoken dispatches; the preference is saved in the current browser. The **VOX** button in the command bar remains available as a quick toggle. Use the **SND** button to toggle procedural simulator sound effects independently.
+Crew communications use a separate local neural TTS process powered by HeadTTS and the Kokoro model. The simulator remains a browser application; the TTS server runs as a separate Node.js process on the same computer.
 
-- VOX uses the browser's Web Speech API and selects the best available English system voice, preferring an installed/local voice where the browser exposes that information.
+### Start the local voice engine
+
+Requirements:
+- Node.js 20 or newer.
+- Git.
+- An internet connection for the first installation and model/voice download.
+
+From the simulator project directory, open a terminal and run:
+
+```bash
+node tts-server/start.mjs
+```
+
+The bootstrapper clones the upstream HeadTTS project into `~/.submarine-headtts` (outside the simulator repository), installs its dependencies on first run, and starts the local REST server at `http://127.0.0.1:8882`. The model is cached on the computer after its first download. Leave this terminal running while playing; **Ctrl+C** stops the service.
+
+The launcher applies a small local-only patch to the upstream server so it binds to `127.0.0.1` rather than all network interfaces. If the upstream implementation changes and the patch cannot be applied safely, startup stops and reports the issue.
+
+### Configure the crew
+
+Open **OPTIONS** from the command bar:
+- **CREW VOICE COMMUNICATIONS** enables/disables spoken callouts. The setting is saved in the current browser.
+- **CREW VOICE PROFILE** selects the neural voice. Available profiles are Michael, Fenrir, and Onyx (American male), plus Bella and Sarah (American female).
+- **VOICE TEST** generates and plays a radio check through the local Kokoro model.
+
+The selected voice profile is saved in the browser. The model currently uses American English. Keep the TTS terminal open while using VOX; if the service is stopped, the simulator keeps all text messages visible and reports the local TTS connection error in OPTIONS.
+
+### Dispatch and audio behavior
+
 - Important operational events are spoken: alerts, selected sonar reports, and significant weapons events. Routine console log entries remain on screen only.
 - Urgent alerts interrupt the current callout. Ordinary callouts are queued so they do not overlap.
-- Use **VOICE TEST** at any time to play a diagnostic radio check directly through the browser speech engine. This also confirms whether the selected voice actually starts. The opening/closing radio squelch is synthesized locally by the simulator's Web Audio engine.
-- Voice availability, accent, and naturalness depend on the browser and operating-system voice packs. Install an English voice in the OS settings for the best result.
-
-No external TTS service or API key is used. The radio squelch is an effect around the announcement; the browser-generated voice is not routed through a true narrowband radio filter. Some operating-system voice packs may need to be installed or downloaded separately.
+- Generated WAV audio passes through a local radio-style DSP chain: high-pass and low-pass filtering plus light dynamic compression. SND effects and VOX voice playback are independent.
+- No hosted TTS endpoint, external API key, or per-request cloud charge is used. The first setup requires an internet connection to download HeadTTS dependencies and Kokoro model assets; speech synthesis runs locally after that.
