@@ -52,42 +52,31 @@ These limitations are explicit so that the interface's realistic presentation is
 
 The core simulator needs no package installation or build step. Optional neural crew voices run in a separate local Node.js server.
 
-### Recommended: local HTTP server
+### One-command launch (macOS / Linux)
 
-From the project directory:
-
-```bash
-python3 -m http.server 8080
-```
-
-Then open [http://localhost:8080](http://localhost:8080).
-
-On Windows, you can also use:
-
-```powershell
-py -m http.server 8080
-```
-
-Opening `index.html` directly may work, but serving the files over HTTP is recommended for browser API and asset compatibility. For local neural voices, use this local HTTP address on the same computer rather than relying on a remotely hosted copy of the simulator; browser local-network protections can restrict remote pages from reaching loopback services.
-
-An internet connection is required for third-party map tiles and the optional online elevation request. Core simulation logic runs locally; map layers and online probes may be unavailable offline.
-
-### Optional: local neural crew voices
-
-Crew voice generation uses the local HeadTTS/Kokoro server. It requires Node.js 20 or newer, Git, and an internet connection for the initial install/model download.
-
-From the project directory, start the voice server in a separate terminal:
+Install Node.js 20+ and Git, then from the project directory run:
 
 ```bash
-node tts-server/start.mjs
+bash start-local.sh
 ```
 
-The bootstrapper clones HeadTTS into `~/.submarine-headtts`, installs its dependencies once, and starts the REST service on `127.0.0.1:8882`. The model and voice assets are downloaded/cached on first use. Keep this terminal open while playing; press **Ctrl+C** to stop the service.
+This single launcher starts the local HeadTTS/Kokoro voice service and the simulator's HTTP server, waits for both to become ready, and opens the simulator in your browser. Keep the terminal open while playing; press **Ctrl+C** to stop the services started by the script. Existing HeadTTS instances on `127.0.0.1:8882` are reused.
 
-In the simulator, open **OPTIONS**, enable **CREW VOICE COMMUNICATIONS**, choose a **CREW VOICE PROFILE**, then press **VOICE TEST**. The bundled profiles are Fenrir (American male) and Bella (American female). The first synthesis may take longer while model assets are prepared.
+To choose another web port, use `SIM_PORT=8090 bash start-local.sh`. To suppress automatic browser opening, use `bash start-local.sh --no-open`.
 
-The bootstrapper restricts the upstream listener to loopback rather than exposing the unauthenticated TTS service to the LAN. If the upstream server source changes and the safe loopback patch no longer matches, startup stops instead of binding an unverified listener. Voice generation itself runs locally; there is no hosted TTS endpoint or API key.
+The launcher writes service logs to `~/.submarine-simulator/logs/`. The first run clones HeadTTS into `~/.submarine-headtts`, installs its dependencies, and downloads Kokoro/model assets. This initial setup requires an internet connection and may take several minutes.
 
+Open **OPTIONS**, enable **CREW VOICE COMMUNICATIONS**, choose **CREW VOICE PROFILE**, then press **VOICE TEST**. The bundled profiles are Fenrir (American male) and Bella (American female).
+
+### Manual launch (optional)
+
+The two services can also be started separately:
+- Simulator web server: `python3 -m http.server 8080 --bind 127.0.0.1`
+- Voice server: `node tts-server/start.mjs`
+
+The TTS bootstrapper restricts its unauthenticated REST listener to loopback rather than exposing it to the LAN. If the upstream server source changes and the safe loopback patch no longer matches, startup stops. Voice generation itself runs locally; there is no hosted TTS endpoint or API key.
+
+An internet connection is required for the initial model installation, third-party map tiles, and the optional online elevation request. Core simulation logic runs locally; map layers and online probes may be unavailable offline.
 ## Tests
 
 The project includes Node.js unit tests for the fixed-step simulation clock, compartment damage-control model, crew voice dispatch routing, and the local Kokoro TTS client. From the project directory, run:
@@ -102,6 +91,7 @@ No third-party Node packages are required for this test suite.
 
 ```text
 submarine/
+├── start-local.sh              # One-command local launcher for simulator and Kokoro TTS
 ├── index.html                  # Main interface and station layouts
 ├── README.md                   # Project overview and setup
 ├── HOWTO.md                    # Operator guide
