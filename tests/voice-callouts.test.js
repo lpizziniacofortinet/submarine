@@ -118,7 +118,7 @@ test('voice preference persists when disabled from simulator options', () => {
   assert.equal(engine.setVoiceEnabled(false), false);
   assert.equal(storedSettings.get('ssn774_voice_enabled_v2'), 'false');
   assert.equal(engine.setVoiceEnabled(true), true);
-  assert.equal(storedSettings.get('ssn774_voice_enabled'), 'true');
+  assert.equal(storedSettings.get('ssn774_voice_enabled_v2'), 'true');
 });
 
 test('local HeadTTS health check recognizes the local server', async () => {
