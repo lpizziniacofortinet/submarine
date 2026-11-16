@@ -1280,6 +1280,7 @@ class SubmarineWorld {
     });
 
     const voiceBtn = document.getElementById('btn-voice-toggle');
+    const voiceTestBtn = document.getElementById('btn-voice-test');
     if (voiceBtn) {
       const voiceAvailable = window.SubAudio.speechSupported;
       voiceBtn.disabled = !voiceAvailable;
@@ -1291,10 +1292,26 @@ class SubmarineWorld {
           : 'Speech synthesis is not available in this browser';
       };
       paintVoiceButton(window.SubAudio.voiceEnabled);
+      window.SubAudio.onVoiceStatus = (state, detail) => {
+        voiceBtn.title = detail || 'Local crew voice communications';
+        if (voiceTestBtn && state === 'error') {
+          voiceTestBtn.textContent = 'VOICE ERR';
+          voiceTestBtn.title = detail;
+        } else if (voiceTestBtn && state === 'ready') {
+          voiceTestBtn.textContent = 'VOICE TEST';
+          voiceTestBtn.title = detail || 'Test local crew voice playback';
+        }
+      };
       voiceBtn.addEventListener('click', () => {
         const on = window.SubAudio.toggleVoice();
         paintVoiceButton(on);
-        if (on) window.SubAudio.speak('Conn, radio check. How copy?', true);
+      });
+    }
+    if (voiceTestBtn) {
+      voiceTestBtn.disabled = !window.SubAudio.speechSupported;
+      voiceTestBtn.addEventListener('click', () => {
+        const started = window.SubAudio.testVoice();
+        if (!started) voiceTestBtn.title = 'Voice test could not start. Check browser speech settings.';
       });
     }
 
