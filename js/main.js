@@ -1208,6 +1208,13 @@ class SubmarineWorld {
     });
 
     // Time Compression & Audio
+    const torpedoAnnunciator = document.getElementById('ann-torpedo');
+    torpedoAnnunciator.addEventListener('click', () => {
+      if (window.SubAudio) window.SubAudio.stopAlarm('TORPEDO');
+      torpedoAnnunciator.title = 'Torpedo warning acknowledged; visual warning remains active';
+      window.GameLogger.log('CONN', 'Torpedo warning audible alarm silenced. Visual annunciator remains active while the threat is present.', 'conn');
+    });
+
     const setTimeRate = (rate) => {
       this.timeCompression = rate;
       document.getElementById('hud-sim-rate').textContent = `${rate}x SPEED`;
