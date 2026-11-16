@@ -242,6 +242,14 @@ body.red-alert {
   white-space: nowrap;
 }
 
+#ann-torpedo {
+  cursor: pointer;
+}
+
+#ann-torpedo:hover {
+  filter: brightness(1.2);
+}
+
 .annunciator {
   font-size: 10px;
   font-weight: bold;
