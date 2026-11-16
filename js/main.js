@@ -107,6 +107,7 @@ class SubmarineWorld {
       { index: 6, state: 'READY', weapon: 'UGM-109E TOMAHAWK' }
     ];
 
+    this.simulationClock = new window.SimulationClock({ fixedStepSec: 1 / 30, maxFrameDeltaSec: 0.25, maxSubSteps: 8 });
     this.waterfallTimer = 0;
     this.uiRefreshTimer = 0;
     this.autoSaveTimer = 0;
@@ -135,9 +136,11 @@ class SubmarineWorld {
 
     let lastTimestamp = performance.now();
     const loop = (now) => {
-      const rawDt = Math.min(0.1, (now - lastTimestamp) / 1000.0);
+      const rawDt = Math.max(0, (now - lastTimestamp) / 1000.0);
       lastTimestamp = now;
-      this.stepSimulation(rawDt * this.timeCompression, rawDt);
+      this.simulationClock.advance(rawDt, (fixedDt) => {
+        this.stepSimulation(fixedDt * this.timeCompression, fixedDt);
+      });
       requestAnimationFrame(loop);
     };
     requestAnimationFrame(loop);
@@ -168,7 +171,7 @@ class SubmarineWorld {
     if (!this.currentMission || this.gameOver) return;
     try {
       const state = {
-        version: 1,
+        version: 2,
         savedAtStr: new Date().toLocaleTimeString(),
         simTimeSec: this.simTimeSec,
         currentMission: this.currentMission,
@@ -207,7 +210,8 @@ class SubmarineWorld {
           dieselRunning: this.reactor.dieselRunning
         },
         contacts: this.contacts.map((c) => c.serialize()),
-        weapons: this.weapons.filter((w) => !w.exploded).map((w) => w.serialize())
+        weapons: this.weapons.filter((w) => !w.exploded).map((w) => w.serialize()),
+        decoys: this.decoys.map((decoy) => ({ ...decoy }))
       };
 
       localStorage.setItem(this.SAVE_KEY, JSON.stringify(state));
@@ -228,9 +232,9 @@ class SubmarineWorld {
       if (!data || !data.currentMission) return false;
 
       this.currentMission = data.currentMission;
-      this.simTimeSec = data.simTimeSec || 4 * 3600;
-      this.selectedContactId = data.selectedContactId || null;
-      this.weaponSerial = data.weaponSerial || 1;
+      this.simTimeSec = data.simTimeSec ?? 4 * 3600;
+      this.selectedContactId = data.selectedContactId ?? null;
+      this.weaponSerial = data.weaponSerial ?? 1;
       this.torpedoMagazine = data.torpedoMagazine !== undefined ? data.torpedoMagazine : 16;
       if (data.torpedoTubes) this.torpedoTubes = data.torpedoTubes;
       if (data.vlsTubes) this.vlsTubes = data.vlsTubes;
@@ -251,7 +255,7 @@ class SubmarineWorld {
       // Restore contacts & active weapons
       this.contacts = (data.contacts || []).map((cfg, idx) => new window.ContactEntity(idx + 1, cfg));
       this.weapons = (data.weapons || []).map((wcfg) => new window.WeaponEntity(wcfg));
-      this.decoys = [];
+      this.decoys = Array.isArray(data.decoys) ? data.decoys.map((decoy) => ({ ...decoy })) : [];
       this.gameOver = false;
 
       if (window.Stations.leafletMap) {
