@@ -18,6 +18,7 @@ The project is built with HTML5, CSS, Canvas, and vanilla JavaScript. It has no 
 - Helm orders, depth control, hydroplanes, rudder, ballast, trim, and emergency surfacing.
 - A simplified S9G-inspired reactor and propulsion model with control rods, coolant-pump modes, battery, diesel generator, and SCRAM protection.
 - Torpedo tubes, VLS launch controls, wire-guidance gameplay, and acoustic decoys.
+- Compartment-based damage control, localized flooding, dewatering, and subsystem degradation.
 
 ### Sensors and acoustic environment
 - Passive broadband bearing-time waterfall and a profile-based LOFAR/DEMON-style display.
@@ -28,6 +29,7 @@ The project is built with HTML5, CSS, Canvas, and vanilla JavaScript. It has no 
 
 ### Persistence and simulation controls
 - Fixed-step simulation clock.
+- F7 damage-control station with a live longitudinal compartment diagram.
 - 1x, 2x, 5x, and 10x time-compression controls.
 - Browser local-storage autosave and manual save/resume.
 - JSON save export.
@@ -96,6 +98,7 @@ submarine/
     ├── entities.js             # Contacts, tracking, weapons, and serialization
     ├── main.js                 # Simulation loop, UI controller, and save/load
     ├── missions.js             # Bases, acoustic profiles, missions, and generated traffic
+    ├── damage-control.js       # Compartment integrity, flooding, and system-health model
     ├── physics.js              # Submarine movement, ballast, and sonar propagation model
     ├── reactor.js              # Simplified reactor and propulsion plant model
     └── stations.js             # Map, sonar, TMA, reactor, and periscope renderers
