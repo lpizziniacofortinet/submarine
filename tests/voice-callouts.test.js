@@ -123,13 +123,13 @@ test('local HeadTTS health check recognizes the local server', async () => {
 });
 
 test('VOICE TEST requests neural WAV audio from the local Kokoro engine', async () => {
-  assert.equal(engine.setVoiceProfile('am_michael'), true);
+  assert.equal(engine.setVoiceProfile('am_fenrir'), true);
   assert.equal(engine.testVoice(), true);
   await engine._ttsProcessing;
 
   assert.equal(synthRequests.length, 1);
   assert.match(synthRequests[0].input, /USS Virginia/);
-  assert.equal(synthRequests[0].voice, 'am_michael');
+  assert.equal(synthRequests[0].voice, 'am_fenrir');
   assert.equal(synthRequests[0].language, 'en-us');
   assert.equal(synthRequests[0].audioEncoding, 'wav');
   assert.ok(voiceStatuses.some((status) => status.state === 'speaking'));
