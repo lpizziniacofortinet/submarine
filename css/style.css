@@ -1044,7 +1044,8 @@ select.mil-select, input.mil-input {
   font-size: 8px;
   letter-spacing: 0.7px;
 }
-.scope-credit strong[data-state="loading"] { color: #e0bd80; }
+.scope-credit strong[data-state="loading"],
+.scope-credit strong[data-state="fallback"] { color: #e0bd80; }
 .scope-credit strong[data-state="ready"],
 .scope-credit strong[data-state="cached"] { color: #9bd4be; }
 .scope-credit strong[data-state="offline"] { color: #d6a16b; }
