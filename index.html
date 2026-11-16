@@ -10,6 +10,19 @@
 </head>
 <body class="crt-effect">
   <div id="app-container">
+    <!-- TOP STATION MENU: FUNCTION KEYS -->
+    <nav id="station-nav" aria-label="Station selection">
+      <div id="station-primary-row">
+        <button class="station-tab active" data-station="tactical">[F1] GEO / TACTICAL PLOT</button>
+        <button class="station-tab" data-station="sonar">[F2] SONAR &amp; TMA</button>
+        <button class="station-tab" data-station="weapons">[F3] FIRE CONTROL</button>
+        <button class="station-tab" data-station="maneuvering">[F4] MANEUVERING</button>
+        <button class="station-tab" data-station="reactor">[F5] NUCLEAR REACTOR</button>
+        <button class="station-tab" data-station="periscope">[F6] PERISCOPE / ESM</button>
+        <button class="station-tab" data-station="damage-control">[F7] DAMAGE CONTROL</button>
+      </div>
+    </nav>
+
     <!-- TOP TELEMETRY & SHIP STATUS HUD -->
     <header id="top-hud">
       <!-- Box 1: Boat Identity & Mission Clock -->
@@ -93,22 +106,13 @@
       </div>
     </header>
 
-    <!-- STATION SELECTOR BAR & MASTER WARNING ANNUNCIATORS -->
-    <nav id="station-nav">
-      <div id="station-primary-row">
-        <button class="station-tab active" data-station="tactical">[F1] GEO / TACTICAL PLOT</button>
-        <button class="station-tab" data-station="sonar">[F2] SONAR &amp; TMA</button>
-        <button class="station-tab" data-station="weapons">[F3] FIRE CONTROL (WEPS)</button>
-        <button class="station-tab" data-station="maneuvering">[F4] MANEUVERING &amp; TRIM</button>
-        <button class="station-tab" data-station="reactor">[F5] S9G NUCLEAR REACTOR</button>
-        <button class="station-tab" data-station="periscope">[F6] PERISCOPE / RADAR / ESM</button>
-        <button class="station-tab" data-station="damage-control">[F7] DAMAGE CONTROL</button>
+    <!-- SHIP CONTROLS AND MASTER WARNING ANNUNCIATORS -->
+    <nav id="station-tools-nav" aria-label="Ship controls and warnings">
+      <div id="station-tools-row">
         <div class="nav-spacer"></div>
         <button class="mil-btn amber" id="btn-open-briefing" style="margin-left:6px;">NATO BASE / MISSION</button>
         <button class="mil-btn" id="btn-quick-save" title="Save Patrol Progress to Browser Storage">SAVE</button>
       </div>
-
-      <!-- Master Warning Annunciator Lights -->
       <div id="annunciator-strip">
         <div class="annunciator" id="ann-cavitating">CAVITATION</div>
         <div class="annunciator" id="ann-thermocline">BELOW LAYER</div>
