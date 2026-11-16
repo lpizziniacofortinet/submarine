@@ -23,6 +23,8 @@ class SubAudioEngine {
     this.alarmNodes = [];
     this.sonarReverb = null;
     this.sonarReverbGain = null;
+    this.sonarSampleUrl = 'https://opengameart.org/sites/default/files/sonar_ping_0.mp3';
+    this.sonarAudioPlayers = Object.create(null);
 
     // Continuous nodes
     this.ambientGain = null;
@@ -69,6 +71,7 @@ class SubAudioEngine {
       this.masterGain.connect(this.ctx.destination);
 
       this.setupSonarReverb();
+      this.preloadSonarRecordings();
       this.setupContinuousLoops();
       this.initialized = true;
       this.playConsoleBeep(880, 0.06);
@@ -81,6 +84,9 @@ class SubAudioEngine {
     this.volume = Math.max(0, Math.min(1, Number(val)));
     if (this.masterGain && this.ctx) {
       this.masterGain.gain.setTargetAtTime(this.enabled ? this.volume : 0, this.ctx.currentTime, 0.05);
+    }
+    for (const player of Object.values(this.sonarAudioPlayers)) {
+      if (player) player.volume = this.enabled ? this.volume * (player.subVolumeScale || 1) : 0;
     }
   }
 
@@ -405,6 +411,57 @@ class SubAudioEngine {
   }
 
   /**
+   * Preload a real CC0 submarine sonar recording from OpenGameArt.
+   * Audio elements are kept separate so incoming and outgoing pings can overlap.
+   */
+  preloadSonarRecordings() {
+    if (typeof Audio === 'undefined') return;
+    for (const channel of ['active', 'hostile']) {
+      try {
+        const player = new Audio(this.sonarSampleUrl);
+        player.preload = 'auto';
+        player.volume = this.volume;
+        player.subVolumeScale = 1;
+        this.sonarAudioPlayers[channel] = player;
+        player.load();
+      } catch (error) {
+        this.sonarAudioPlayers[channel] = null;
+      }
+    }
+  }
+
+  /**
+   * Play the recorded ping. If the external asset is unavailable or playback
+   * is blocked, fall back to the procedural pulse so gameplay remains audible.
+   */
+  playSonarRecording(channel, volumeScale, playbackRate, fallbackOptions) {
+    const player = this.sonarAudioPlayers[channel];
+    if (!player || !this.enabled) return false;
+
+    const fallback = () => {
+      if (this.ctx && this.enabled) {
+        this.scheduleSonarPulse(this.ctx.currentTime, fallbackOptions);
+      }
+    };
+
+    try {
+      player.pause();
+      player.currentTime = 0;
+      player.playbackRate = playbackRate;
+      player.subVolumeScale = volumeScale;
+      player.volume = Math.max(0, Math.min(1, this.volume * volumeScale));
+      const playResult = player.play();
+      if (playResult && typeof playResult.catch === 'function') {
+        playResult.catch(fallback);
+      }
+      return true;
+    } catch (error) {
+      fallback();
+      return false;
+    }
+  }
+
+  /**
    * Build a short, diffuse underwater impulse response. The convolver is
    * shared by all sonar transmissions so each ping has a soft acoustic tail.
    */
@@ -529,12 +586,20 @@ class SubAudioEngine {
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
-    this.scheduleSonarPulse(now, {
+    const recorded = this.playSonarRecording('active', 0.78, 1.0, {
       level: 1,
       frequency: 3500,
       tailSec: 1.6,
       transient: true
     });
+    if (!recorded) {
+      this.scheduleSonarPulse(now, {
+        level: 1,
+        frequency: 3500,
+        tailSec: 1.6,
+        transient: true
+      });
+    }
 
     // Round-trip propagation at approximately 1500 m/s:
     // 2 x 1852 metres per nautical mile.
@@ -564,12 +629,20 @@ class SubAudioEngine {
     if (!this.ctx) return;
 
     const level = Math.min(0.82, Math.max(0.16, snrDb * 0.025));
-    this.scheduleSonarPulse(this.ctx.currentTime, {
+    const recorded = this.playSonarRecording('hostile', 0.7 * level, 1.06, {
       level,
       frequency: 4520,
       tailSec: 1.2,
       transient: true
     });
+    if (!recorded) {
+      this.scheduleSonarPulse(this.ctx.currentTime, {
+        level,
+        frequency: 4520,
+        tailSec: 1.2,
+        transient: true
+      });
+    }
   }
 
   /**
