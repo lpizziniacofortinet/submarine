@@ -29,7 +29,7 @@ The project is built with HTML5, CSS, Canvas, and vanilla JavaScript. It has no 
 
 ### Persistence and simulation controls
 - Fixed-step simulation clock.
-- Selective neural crew voice callouts via a local HeadTTS/Kokoro server, with persistent voice profiles, radio-band DSP, and no external API key.
+- Optional neural crew voice callouts via a local HeadTTS/Kokoro server. VOX is disabled by default and the server starts only when explicitly requested.
 - F7 damage-control station with a live longitudinal compartment diagram.
 - 1x, 2x, 5x, and 10x time-compression controls.
 - Browser local-storage autosave and manual save/resume.
@@ -50,7 +50,7 @@ These limitations are explicit so that the interface's realistic presentation is
 
 ## Run locally
 
-The core simulator needs no package installation or build step. Optional neural crew voices run in a separate local Node.js server.
+The core simulator needs no package installation or build step. Optional neural crew voices run in a separate local Node.js server and are disabled by default.
 
 ### One-command launch (macOS / Linux)
 
@@ -60,13 +60,13 @@ Install Node.js 20+ and Git, then from the project directory run:
 bash start-local.sh
 ```
 
-This single launcher starts the local HeadTTS/Kokoro voice service and the simulator's HTTP server, waits for both to become ready, and opens the simulator in your browser. Keep the terminal open while playing; press **Ctrl+C** to stop the services started by the script. Existing HeadTTS instances on `127.0.0.1:8882` are reused.
+The default launcher starts only the simulator's HTTP server and opens it in your browser. No TTS model is installed or started. To opt into neural crew voices, run `bash start-local.sh --with-voice`; this starts the local HeadTTS/Kokoro server as well. Keep the terminal open while playing; press **Ctrl+C** to stop the services started by the script. Existing HeadTTS instances on `127.0.0.1:8882` are reused.
 
-To choose another web port, use `SIM_PORT=8090 bash start-local.sh`. To suppress automatic browser opening, use `bash start-local.sh --no-open`.
+To choose another web port, use `SIM_PORT=8090 bash start-local.sh`. Add `--with-voice` to that command only when you want to run the optional voice engine. To suppress automatic browser opening, use `bash start-local.sh --no-open`.
 
-The launcher writes service logs to `~/.submarine-simulator/logs/`. The first run clones HeadTTS into `~/.submarine-headtts`, installs its dependencies, and downloads Kokoro/model assets. This initial setup requires an internet connection and may take several minutes.
+The launcher writes logs to `~/.submarine-simulator/logs/`. Only the explicit `--with-voice` mode clones HeadTTS into `~/.submarine-headtts`, installs its dependencies, and downloads Kokoro/model assets.
 
-Open **OPTIONS**, enable **CREW VOICE COMMUNICATIONS**, choose **CREW VOICE PROFILE**, then press **VOICE TEST**. The bundled profiles are Fenrir (American male) and Bella (American female).
+VOX is off by default. To try it, start the simulator with `--with-voice`, then open **OPTIONS**, enable **CREW VOICE COMMUNICATIONS**, choose **CREW VOICE PROFILE**, and press **VOICE TEST**. The bundled profiles are Fenrir (American male) and Bella (American female).
 
 ### Manual launch (optional)
 
