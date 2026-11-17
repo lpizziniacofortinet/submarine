@@ -10,7 +10,7 @@
 </head>
 <body class="crt-effect">
   <div id="app-container">
-    <!-- TOP STATION MENU: FUNCTION KEYS -->
+    <!-- TOP STATION MENU: FUNCTION KEYS + MISSION & SAVE -->
     <nav id="station-nav" aria-label="Station selection and ship controls">
       <div id="station-primary-row">
         <button class="station-tab active" data-station="tactical">[F1] GEO / TACTICAL PLOT</button>
@@ -20,10 +20,10 @@
         <button class="station-tab" data-station="reactor">[F5] NUCLEAR REACTOR</button>
         <button class="station-tab" data-station="periscope">[F6] PERISCOPE / ESM</button>
         <button class="station-tab" data-station="damage-control">[F7] DAMAGE CONTROL</button>
-      </div>
-      <div id="station-tools-row">
-        <button class="mil-btn amber" id="btn-open-briefing">NATO BASE / MISSION</button>
-        <button class="mil-btn" id="btn-quick-save" title="Save Patrol Progress to Browser Storage">SAVE</button>
+        <div id="station-tools-row">
+          <button class="mil-btn amber" id="btn-open-briefing">NATO BASE / MISSION</button>
+          <button class="mil-btn" id="btn-quick-save" title="Save Patrol Progress to Browser Storage">SAVE</button>
+        </div>
       </div>
     </nav>
 
