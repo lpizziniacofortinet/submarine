@@ -1049,3 +1049,65 @@ select.mil-select, input.mil-input {
 .scope-credit strong[data-state="ready"],
 .scope-credit strong[data-state="cached"] { color: #9bd4be; }
 .scope-credit strong[data-state="offline"] { color: #d6a16b; }
+
+
+/* ==========================================================================
+   LIVE WEBGL PERISCOPE + EXTERNAL CAMERA
+   ========================================================================== */
+.scope-toolbar { flex-wrap: wrap; justify-content: flex-end; }
+.scope-viewport {
+  background: linear-gradient(180deg, #7098ad 0%, #a9bdc3 46%, #0b5a72 48%, #063448 100%);
+}
+.scope-display-3d {
+  display: none;
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  outline: none;
+  cursor: crosshair;
+  touch-action: none;
+}
+.scope-console.scope-3d-active .scope-display-3d { display: block; }
+.scope-console.scope-3d-active #periscope-canvas { display: none; }
+.scope-console.scope-3d-active .scope-viewport { isolation: isolate; }
+.scope-console.scope-3d-active .scope-live-mark { z-index: 5; }
+.scope-3d-reticle {
+  display: none;
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  top: 53%;
+  width: 116px;
+  height: 78px;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  border: 1px solid rgba(225, 239, 240, 0.46);
+  border-left-color: transparent;
+  border-right-color: transparent;
+  clip-path: polygon(0 0, 28% 0, 28% 13%, 72% 13%, 72% 0, 100% 0, 100% 100%, 72% 100%, 72% 87%, 28% 87%, 28% 100%, 0 100%);
+  opacity: 0.82;
+}
+.scope-3d-reticle::before,
+.scope-3d-reticle::after {
+  content: "";
+  position: absolute;
+  background: rgba(225, 239, 240, 0.55);
+}
+.scope-3d-reticle::before { left: 50%; top: 28px; width: 1px; height: 22px; }
+.scope-3d-reticle::after { left: calc(50% - 11px); top: 39px; width: 22px; height: 1px; }
+.scope-3d-reticle span {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  transform: translate(-50%, -50%);
+  border: 1px solid rgba(225, 239, 240, 0.76);
+  border-radius: 50%;
+}
+@media (max-width: 1050px) {
+  .scope-toolbar { justify-content: flex-start; }
+  .scope-console .mil-btn.scope-control { font-size: 9px; padding: 4px 6px; }
+}
