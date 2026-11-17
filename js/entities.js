@@ -60,6 +60,11 @@ class ContactEntity {
     this.estRangeNm = config.estRangeNm || 6.0;
     this.estHeading = config.estHeading || 0;
     this.estSpeedKts = config.estSpeedKts || 10;
+    this.tmaObservable = Boolean(config.tmaObservable);
+    this.tmaRmsDeg = config.tmaRmsDeg || 0;
+    this.tmaSolver = window.BearingOnlyTMASolver
+      ? new window.BearingOnlyTMASolver(config.tmaState || null)
+      : null;
   }
 
   serialize() {
@@ -96,7 +101,10 @@ class ContactEntity {
       classifiedAs: this.classifiedAs,
       estRangeNm: this.estRangeNm,
       estHeading: this.estHeading,
-      estSpeedKts: this.estSpeedKts
+      estSpeedKts: this.estSpeedKts,
+      tmaObservable: this.tmaObservable,
+      tmaRmsDeg: this.tmaRmsDeg,
+      tmaState: this.tmaSolver ? this.tmaSolver.serialize() : null
     };
   }
 
@@ -173,8 +181,8 @@ class ContactEntity {
       this.updateHostileAI(dt, ownSub, thermoclineDepthM, world);
     }
 
-    // 4. Player Sonar Detection & TMA Solution Update
-    this.updatePlayerTMA(dt, ownSub, thermoclineDepthM);
+    // 4. Player Sonar Detection & True Bearing-Only TMA Solution Update
+    this.updatePlayerTMA(dt, ownSub, thermoclineDepthM, world);
   }
 
   updateHostileAI(dt, ownSub, thermoclineDepthM, world) {
@@ -288,7 +296,7 @@ class ContactEntity {
     }
   }
 
-  updatePlayerTMA(dt, ownSub, thermoclineDepthM) {
+  updatePlayerTMA(dt, ownSub, thermoclineDepthM, world) {
     const prevBrg = this.lastTrueBrg;
     const sonarResult = window.SubPhysics.computePassiveSonarSNR({
       sourceLat: this.lat,
@@ -319,13 +327,13 @@ class ContactEntity {
     const isAisBroadcast = this.profile.allegiance === 'NEUTRAL' && ownSub.esmMastRaised && ownSub.depthM <= 20 && sonarResult.rangeNm <= 18.0;
     const canSeeOnRadar = ownSub.radarTxActive && this.depthM <= 2 && sonarResult.rangeNm <= 16.0;
     const canSeeOnScope = ownSub.periscopeRaised && this.depthM <= 5 && sonarResult.rangeNm <= 9.0;
+    const hasDirectRangeAid = canSeeOnRadar || canSeeOnScope || isFriendlyLink || isAisBroadcast;
 
-    if (this.snrDb >= 0 || canSeeOnRadar || canSeeOnScope || isFriendlyLink || isAisBroadcast) {
+    if (this.snrDb >= 0 || hasDirectRangeAid) {
       if (!this.detected) {
         this.detected = true;
         if (isFriendlyLink) {
           this.classifiedAs = this.profile.id;
-          this.tmaQualityPct = 98;
         }
         if (isAisBroadcast && !this.classifiedAs) {
           this.classifiedAs = this.profile.id;
@@ -347,24 +355,39 @@ class ContactEntity {
         }
       }
 
-      let tmaGainRate = 1.1;
-      if (ownSub.towedArrayDeployed) tmaGainRate += 0.9;
-      if (Math.abs(this.bearingRateDegMin) > 1.2) tmaGainRate += 1.6;
-      if (canSeeOnRadar || canSeeOnScope || isFriendlyLink || isAisBroadcast) tmaGainRate += 22.0;
+      if (this.tmaSolver) {
+        const simTimeSec = world && Number.isFinite(world.simTimeSec) ? world.simTimeSec : (Date.now() / 1000);
+        // Passive sonar bearing noise depends on SNR & towed array aperture
+        const snrFactor = Math.max(0.35, Math.min(1.6, 1.4 - this.snrDb * 0.035));
+        const baseSigma = ownSub.towedArrayDeployed ? 0.45 : 0.85;
+        const bearingSigmaDeg = baseSigma * snrFactor;
+        const measuredBrg = hasDirectRangeAid
+          ? sonarResult.trueBrg
+          : (sonarResult.trueBrg + (Math.random() - 0.5) * 1.6 * bearingSigmaDeg + 360) % 360;
 
-      this.tmaQualityPct = Math.min(100, this.tmaQualityPct + tmaGainRate * dt);
+        this.tmaSolver.addObservation({
+          timeSec: simTimeSec,
+          ownLat: ownSub.lat,
+          ownLon: ownSub.lon,
+          bearingDeg: measuredBrg,
+          rangeNm: hasDirectRangeAid ? sonarResult.rangeNm : null,
+          bearingSigmaDeg
+        });
+
+        const sol = this.tmaSolver.solve(simTimeSec, ownSub.lat, ownSub.lon);
+        this.estRangeNm = sol.estRangeNm;
+        this.estHeading = sol.estHeading;
+        this.estSpeedKts = sol.estSpeedKts;
+        this.tmaQualityPct = hasDirectRangeAid ? Math.max(sol.qualityPct, 96) : sol.qualityPct;
+        this.tmaObservable = sol.observable;
+        this.tmaRmsDeg = sol.rmsDeg;
+      }
     } else {
       this.tmaQualityPct = Math.max(0, this.tmaQualityPct - 0.6 * dt);
       if (this.tmaQualityPct <= 0) {
         this.detected = false;
       }
     }
-
-    const errFactor = Math.max(0.01, (100 - this.tmaQualityPct) / 100.0);
-    const deterministicBias = Math.sin(this.lastTrueBrg * 0.17);
-    this.estRangeNm = Math.max(0.2, sonarResult.rangeNm * (1 + deterministicBias * 0.42 * errFactor));
-    this.estHeading = Math.round((this.heading + deterministicBias * 35 * errFactor + 360) % 360);
-    this.estSpeedKts = Math.max(0, Math.round(this.speedKts + deterministicBias * 6 * errFactor));
   }
 }
 

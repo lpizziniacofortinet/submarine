@@ -120,10 +120,11 @@ The narrowband panel shows tonal values and blade-count information associated w
 
 **Important implementation detail:** the current display is profile-driven. It does not derive a live LOFAR/DEMON spectrum from sampled hydrophone audio or run an FFT over the audio stream.
 
-### TMA display
-The TMA panel presents bearing, bearing rate, a quality percentage, estimated range, and estimated course/speed. A course change and towed-array setting can affect the displayed tracking quality.
-
-**Do not interpret the current TMA percentage as a real bearing-only fire-control solution.** The current code reads simulated target truth (including true bearing and range) and calculates estimates from that information with a quality-dependent bias. It does not solve target motion independently from a history of noisy bearings and own-ship maneuvers.
+### TMA display (Bearing-Only Solver)
+The TMA panel runs a 4-state Cartesian **Levenberg-Marquardt bearing-only solver** (`js/tma-solver.js`) using only your own-ship track and passive sonar bearings:
+- Along a single straight course, range is mathematically unobservable (`MANEUVER REQ (BEARING-ONLY)`).
+- Execute a **TMA Leg** by turning `30°–60°` so your own-ship maneuver creates cross-track bearing parallax; the solver will converge on the target's true range, course, and speed (`CONVERGING` → `FIRING SOLUTION`) and display the intersecting bearing-line fan on the TMA plot.
+- Active sonar pings, surface radar, periscope lock, and NATO Link-16 provide direct range aids that break range ambiguity immediately.
 
 ### Active sonar
 Use **ACTIVE PING (3.5 kHz)** from the map or sonar station. In the current game logic, an active ping provides a rapid contact/range update and raises the displayed TMA quality for eligible contacts. It also triggers the active-sonar annunciation and contact-response gameplay.

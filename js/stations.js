@@ -620,8 +620,40 @@ class StationRenderers {
       return;
     }
 
+    const scalePxPerNm = 7.5;
+
+    // Draw historical own-ship maneuver track & bearing-line fan from TMA solver
+    if (sel.tmaSolver && sel.tmaSolver.observations.length > 1) {
+      const obsList = sel.tmaSolver.observations;
+      const latestObs = obsList[obsList.length - 1];
+      const step = Math.max(1, Math.floor(obsList.length / 8));
+
+      for (let i = 0; i < obsList.length; i += step) {
+        const o = obsList[i];
+        const ox = cx + (o.ox - latestObs.ox) * scalePxPerNm;
+        const oy = cy - (o.oy - latestObs.oy) * scalePxPerNm;
+        const rayLen = 85;
+        ctx.strokeStyle = 'rgba(0, 229, 255, 0.20)';
+        ctx.beginPath();
+        ctx.moveTo(ox, oy);
+        ctx.lineTo(ox + Math.sin(o.b) * rayLen, oy - Math.cos(o.b) * rayLen);
+        ctx.stroke();
+      }
+
+      ctx.strokeStyle = '#00ff66';
+      ctx.beginPath();
+      for (let i = 0; i < obsList.length; i++) {
+        const o = obsList[i];
+        const ox = cx + (o.ox - latestObs.ox) * scalePxPerNm;
+        const oy = cy - (o.oy - latestObs.oy) * scalePxPerNm;
+        if (i === 0) ctx.moveTo(ox, oy);
+        else ctx.lineTo(ox, oy);
+      }
+      ctx.stroke();
+    }
+
     const brgRad = ((sel.lastTrueBrg - 90) * Math.PI) / 180;
-    const distPx = Math.min(72, sel.estRangeNm * 8.5);
+    const distPx = Math.min(72, sel.estRangeNm * scalePxPerNm);
     const tx = cx + Math.cos(brgRad) * distPx;
     const ty = cy + Math.sin(brgRad) * distPx;
 
@@ -631,7 +663,7 @@ class StationRenderers {
     ctx.lineTo(tx, ty);
     ctx.stroke();
 
-    ctx.fillStyle = '#ffb000';
+    ctx.fillStyle = sel.tmaObservable ? '#00ff66' : '#ffb000';
     ctx.beginPath();
     ctx.arc(tx, ty, 4, 0, Math.PI * 2);
     ctx.fill();
@@ -642,6 +674,10 @@ class StationRenderers {
     ctx.moveTo(tx, ty);
     ctx.lineTo(tx + Math.cos(crsRad) * 22, ty + Math.sin(crsRad) * 22);
     ctx.stroke();
+
+    ctx.fillStyle = sel.tmaObservable ? '#00ff66' : '#ffb000';
+    ctx.font = '9px Courier New';
+    ctx.fillText(sel.tmaObservable ? 'TMA SOLVED' : 'NEED TMA LEG', 6, 12);
   }
 
   /**

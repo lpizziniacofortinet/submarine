@@ -510,10 +510,28 @@ class SubmarineWorld {
       if (dNm <= 18.0) {
         echoRanges.push(dNm);
         c.detected = true;
-        c.tmaQualityPct = Math.max(c.tmaQualityPct, 96);
-        c.estRangeNm = dNm;
-        c.estHeading = Math.round(c.heading);
-        c.estSpeedKts = Math.round(c.speedKts);
+        const brg = window.Bathymetry.bearingDeg(this.ownSub.lat, this.ownSub.lon, c.lat, c.lon);
+        c.lastTrueBrg = brg;
+        if (c.tmaSolver) {
+          c.tmaSolver.addObservation({
+            timeSec: this.simTimeSec,
+            ownLat: this.ownSub.lat,
+            ownLon: this.ownSub.lon,
+            bearingDeg: brg,
+            rangeNm: dNm,
+            bearingSigmaDeg: 0.4
+          });
+          const sol = c.tmaSolver.solve(this.simTimeSec, this.ownSub.lat, this.ownSub.lon);
+          c.estRangeNm = sol.estRangeNm;
+          c.estHeading = sol.estHeading;
+          c.estSpeedKts = sol.estSpeedKts;
+          c.tmaObservable = true;
+          c.tmaRmsDeg = sol.rmsDeg;
+          c.tmaQualityPct = Math.max(sol.qualityPct, 96);
+        } else {
+          c.tmaQualityPct = Math.max(c.tmaQualityPct, 96);
+          c.estRangeNm = dNm;
+        }
 
         // Alert hostile ships/subs to player's exact bearing!
         if (c.profile.allegiance === 'HOSTILE') {
@@ -972,8 +990,13 @@ class SubmarineWorld {
       document.getElementById('tma-class').textContent = prof ? prof.name : 'UNCLASSIFIED (USE DEMON)';
       document.getElementById('tma-brg').textContent =
         `${sel.lastTrueBrg.toFixed(1)}° (${sel.bearingRateDegMin >= 0 ? '+' : ''}${sel.bearingRateDegMin.toFixed(1)}°/m)`;
+      const tmaStateLabel = !sel.tmaObservable
+        ? 'MANEUVER REQ (BEARING-ONLY)'
+        : sel.tmaQualityPct >= 75
+        ? `FIRING SOLUTION (RMS ${sel.tmaRmsDeg || 0}°)`
+        : `CONVERGING (RMS ${sel.tmaRmsDeg || 0}°)`;
       document.getElementById('tma-quality').textContent =
-        `${Math.round(sel.tmaQualityPct)}% (${sel.tmaQualityPct >= 75 ? 'FIRING SOLUTION' : 'TRACKING'})`;
+        `${Math.round(sel.tmaQualityPct)}% (${tmaStateLabel})`;
       document.getElementById('tma-quality-bar').style.width = `${sel.tmaQualityPct}%`;
       document.getElementById('tma-range').textContent =
         `${sel.estRangeNm.toFixed(2)} NM (${Math.round(sel.estRangeNm * 2025.37)} yds)`;
