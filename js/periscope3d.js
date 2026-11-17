@@ -294,6 +294,11 @@
     }
 
     setMode(mode) {
+      if (!this.ready) {
+        const status = document.getElementById('scope-terrain-status');
+        if (status) status.textContent = 'WEBGL UNAVAILABLE — 2D OPTICAL FALLBACK';
+        return;
+      }
       this.mode = mode === 'outside' ? 'outside' : 'periscope';
       const periscopeButton = document.getElementById('btn-scope-view-periscope');
       const outsideButton = document.getElementById('btn-scope-view-outside');
@@ -499,14 +504,14 @@
       const skyCss = 'linear-gradient(180deg, rgb(' +
         Math.round(skyTop[0] * 255) + ',' + Math.round(skyTop[1] * 255) + ',' + Math.round(skyTop[2] * 255) + ') 0%, rgb(' +
         Math.round(skyBottom[0] * 255) + ',' + Math.round(skyBottom[1] * 255) + ',' + Math.round(skyBottom[2] * 255) + ') 48%, #0b566e 50%, #06364b 100%)';
-      this.canvas.style.background = this.mode === 'outside' ? 'linear-gradient(180deg, #7f9eae 0%, #8aa9b3 42%, #0c556d 43%, #06384d 100%)' : skyCss;
+      this.canvas.style.background = skyCss;
 
       const raised = Boolean(sub.periscopeRaised && sub.depthM <= 20.5);
       const thermal = Boolean(stations && stations.scopeThermal);
       const zoom = stations && stations.scopeZoom ? stations.scopeZoom : 1.5;
       let eye, target, fov, fogFar;
       if (this.mode === 'outside') {
-        const orbit = radians(this.orbitYaw);
+        const orbit = radians(sub.heading + this.orbitYaw);
         const pitch = radians(this.orbitPitch);
         const targetY = -Math.max(0, sub.depthM) + 4.5;
         const horizontal = this.orbitDistance * Math.cos(pitch);
@@ -520,7 +525,8 @@
         fogFar = 42000;
       } else {
         const bearing = radians(stations ? stations.scopeBearing : sub.heading);
-        const pitch = raised ? -0.018 : -0.10;
+        // With the mast retracted, look upward through the water from the real hull depth.
+        const pitch = raised ? -0.018 : 0.30;
         const cameraY = raised ? 5.1 : -Math.max(0, sub.depthM) + 2;
         eye = [0, cameraY, 0];
         target = [Math.sin(bearing) * 1000, cameraY + pitch * 1000, Math.cos(bearing) * 1000];
