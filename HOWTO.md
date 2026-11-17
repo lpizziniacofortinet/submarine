@@ -209,21 +209,21 @@ Select an available VLS payload and use its launch control when the in-game laun
 
 Open **F6 — PERISCOPE / RADAR / ESM**.
 
-- **PERISCOPE 3D (First-Person Photonics Mast):** Requires depth `<= 20.0 m` and **RAISE MAST** enabled. Renders a 3D WebGL scene with a 360° polar multi-ring coastal/mountain relief mesh (`0.08 km` – `96 km`), animated waves, and distance-compensated 3D vessels, wakes, whales, and NATO base harbor landmarks.
+- **PERISCOPE 3D (First-Person Photonics Mast):** Requires depth `<= 20.0 m` and **RAISE MAST** enabled. Renders a 3D WebGL scene with a 3D atmospheric sky dome (sun disc, drifting clouds, night stars, and storm lightning), a camera-centered radial LOD ocean with Fresnel reflections and wind-driven swells, a 360° smoothed terrain relief mesh (`0.06 km` – `104 km`) textured with live **ESRI World Imagery** satellite tiles, and distance-compensated 3D vessels, wakes, whales, and NATO base harbor landmarks.
 - **OUTSIDE 3D (External Orbit Camera):** Usable at any depth (including deep submerged operations). Shows your submarine hull, raised masts, the 3D underwater bathymetric seabed, and surrounding contacts/weapons.
 - **Mouse & Slew Controls:** Drag horizontally/vertically on the 3D viewport to slew periscope bearing and look elevation (or orbit in **OUTSIDE 3D**), use the mouse wheel or **ZOOM** button to cycle magnification (`1.5×`, `3.0×`, `6.0×`, `12.0×`), or use **◀ 10°**, **10° ▶**, and **DESIGNATE CONTACT**.
 - **3D-Projected Tactical HUD Overlay:**
   - **Target Lock Brackets:** Projected over visible contacts showing `[SIERRA-X]`, classification, exact distance in `NM` and `yards`, true bearing, and speed. Click a bracket in the 3D viewport to select that contact.
   - **Geographic Landmark & Base Tags:** Labels nearby islands, mountain peaks, shallow shoals (`⚠`), and NATO naval bases (`⚓`) with their distance in `NM`.
   - **360° Surroundings Strip:** Located directly beneath the azimuth compass tape, showing all 360° land sectors (amber) and contacts (red/cyan) relative to your current look direction.
-  - **Bottom `LOS` Rangefinder:** Displays the distance and telemetry of whatever is under the center crosshair (locked contact range/aspect, coastline distance and peak elevation, or open-sea horizon and seafloor depth).
+  - **Bottom `LOS` Rangefinder & Live Weather Bar:** Displays the distance and telemetry of whatever is under the center crosshair (locked contact range/aspect, coastline distance and peak elevation, or open-sea horizon and seafloor depth) alongside live temperature, wind speed/direction, and visibility.
 - **ESM & Surface Radar:** Raise the ESM mast (`<= 20.0 m`) to display simulated radar emissions and AIS transponders, or toggle **RADAR TX** to transmit on the surface-search radar.
 
 Mast depth limits and sensor detections are enforced by the simulation. The ESM/AIS display is not connected to live external feeds.
 
-The 3D terrain and 2D fallback skyline combine the local Natural Earth Mediterranean land mask (`js/med-landmask.js`), procedural bathymetry/relief features, and a 360-degree terrain profile derived from Copernicus DEM GLO-90 elevation samples via the Open-Meteo Elevation API (`js/coastline.js`), accounting for Earth curvature and standard optical refraction. The first DEM lookup at a new position uses an internet connection and caches profiles locally for 30 days; if offline, the local Mediterranean relief model renders immediately.
+The 3D terrain and 2D fallback skyline combine the local Natural Earth Mediterranean land mask (`js/med-landmask.js`), procedural bathymetry/relief features, and a 360-degree terrain profile derived from Copernicus DEM GLO-90 elevation samples via the Open-Meteo Elevation API (`js/coastline.js`), accounting for Earth curvature and standard optical refraction. When online, a `3×3` grid of **ESRI World Imagery** satellite tiles is also composited onto the 3D coastal terrain.
 
-Use **METEO** to cycle through simplified optical visibility presets: CLEAR (55 km), HAZE (24 km), and FOG (7 km). These are visual presets, not a full weather simulation. Terrain attribution is shown beneath the periscope image.
+**Weather & Sky (`METEO`):** By default, **METEO: LIVE** fetches actual current Mediterranean weather conditions (cloud cover, wind speed/direction, visibility, rain, thunderstorm state, and day/night) at your submarine's coordinates from the **Open-Meteo Forecast API** (`js/weather.js`), dynamically driving sea wave height, cloud decks, atmospheric haze, and animated rain streaks. Click **METEO** to cycle between **LIVE**, **CLEAR** (55 km), **HAZE** (24 km), **OVERCAST** (18 km), **STORM** (9 km, high swells & lightning), and **FOG** (5 km). Terrain attribution is shown beneath the periscope image.
 
 ## 11. Save, resume, and export
 

@@ -32,9 +32,11 @@ The project is built with HTML5, CSS, Canvas, and vanilla JavaScript. It has no 
 - TMA-style tracking display, bearing-rate information, estimated range, and contact course/speed.
 - Simplified thermocline, sound-speed, propagation-loss, cavitation, and baffle effects.
 - Leaflet tactical map with selectable map layers, nautical overlays, waypoints, and bathymetry probes.
-- Legacy 2D periscope coastal skyline from Copernicus DEM GLO-90 elevation samples, with Earth-curvature correction and CLEAR / HAZE / FOG visibility presets.
+- Legacy 2D periscope coastal skyline from Copernicus DEM GLO-90 elevation samples, with Earth-curvature correction and visibility presets.
 - WebGL 3D periscope view (`PERISCOPE 3D`) and external hull/seabed camera (`OUTSIDE 3D`), driven by live submarine position, heading, depth, and simulated contact coordinates (`js/periscope3d.js`). Both modes support interactive mouse drag (slew bearing/elevation in periscope mode, orbit camera in external mode) and mouse-wheel zoom (`1.5×` – `12×` optics or `75m` – `680m` external orbit).
-- 360° polar multi-ring 3D terrain and underwater seabed mesh (`0.08 km` to `96 km`) combining the Natural Earth Mediterranean land mask (`js/med-landmask.js`), local relief/bathymetry features, and live Copernicus DEM GLO-90 horizon samples (`js/coastline.js`), with Earth-curvature drop and animated 3D sea waves.
+- **3D Ocean & Atmospheric Sky Dome**: Camera-centered radial LOD ocean mesh (`3m` to `52 km`) with 4-train Gerstner/trochoidal swells scaled by wind speed, per-pixel capillary wave normals, Schlick Fresnel sky reflections, solar glitter, and whitecap foam, paired with a 3D sky hemisphere featuring Rayleigh/Mie scattering, a 3D sun disc, animated FBM clouds, night stars, and thunderstorm lightning.
+- **3D Terrain & Satellite Texturing**: High-resolution 360° polar multi-ring terrain (`144` azimuths × `24` rings out to `104 km`) and underwater seabed mesh with smooth Phong vertex normals, FBM mountain ridges, Copernicus DEM GLO-90 horizon samples (`js/coastline.js`), and a live `768×768` **ESRI World Imagery** satellite texture atlas draped onto Mediterranean coastlines.
+- **Live Real-Time Meteorology (`js/weather.js`)**: Fetches actual current weather conditions (cloud cover, wind speed/direction, visibility, temperature, precipitation, WMO weather code, day/night) at the submarine's coordinates from the **Open-Meteo Forecast API** (`METEO: LIVE` default, with manual `CLEAR`, `HAZE`, `OVERCAST`, `STORM`, and `FOG` presets and animated lens rain streaks).
 - 3D-projected tactical HUD overlay layered over the WebGL viewport, displaying target lock brackets with range (`NM` and `yards`), bearing, and speed, geographic landmark and NATO base distance tags, a 360° surroundings strip (land sectors and contacts around the compass), and a center-reticle Line-of-Sight (`LOS`) stadimeter rangefinder. The 2D optical display remains as an automatic fallback when WebGL is unavailable.
 
 ### Persistence and simulation controls
@@ -110,7 +112,8 @@ submarine/
     ├── bathymetry.js           # Procedural Mediterranean geography and acoustic profile
     ├── coastline.js            # 360° Copernicus DEM GLO-90 & fallback coastline horizon model
     ├── med-landmask.js         # Natural Earth Mediterranean land mask polygons
-    ├── periscope3d.js          # WebGL 3D periscope, external camera, polar terrain & 3D-to-2D projection
+    ├── weather.js              # Live Open-Meteo meteorology service (wind, clouds, rain, visibility)
+    ├── periscope3d.js          # WebGL 3D periscope, sky dome, satellite terrain, ocean & HUD projection
     ├── entities.js             # Contacts, tracking, weapons, and serialization
     ├── main.js                 # Simulation loop, UI controller, and save/load
     ├── missions.js             # Bases, acoustic profiles, missions, and generated traffic
