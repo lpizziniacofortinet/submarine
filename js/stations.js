@@ -1094,29 +1094,173 @@ class StationRenderers {
         ctx.stroke();
       };
 
-      // Retracted state: a clean system slate, with a real depth interlock.
-      if (!raised) {
-        const bg = ctx.createLinearGradient(0, 0, w, h);
-        bg.addColorStop(0, '#1b2b39');
-        bg.addColorStop(0.52, '#0e1b28');
-        bg.addColorStop(1, '#07111b');
-        ctx.fillStyle = bg;
-        ctx.fillRect(0, 0, w, h);
+      // If 3D WebGL Renderer is active, draw a transparent 3D-Projected Tactical HUD Overlay
+      const is3DActive = Boolean(window.Periscope3D && window.Periscope3D.ready);
+      const isOutside3D = Boolean(is3DActive && window.Periscope3D.mode === 'outside');
 
-        ctx.strokeStyle = 'rgba(108, 146, 171, 0.10)';
-        ctx.lineWidth = 1;
-        for (let x = 0; x < w; x += 34) {
-          ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke();
+      if (is3DActive && (raised || isOutside3D)) {
+        ctx.clearRect(0, 0, w, h);
+
+        // 1. Draw 3D-Projected Landmarks, Islands, Shallow Banks & NATO Naval Bases
+        const markers = window.Periscope3D.lastSceneMarkers || [];
+        for (const m of markers) {
+          if (m.kind === 'landmark' || m.kind === 'base') {
+            if (m.y < 68 || m.y > h - 42 || m.x < 24 || m.x > w - 24) continue;
+            const tag = m.kind === 'base'
+              ? `⚓ NATO ${m.name.toUpperCase()} (${m.rangeNm.toFixed(1)} NM)`
+              : m.isShoal
+              ? `⚠ ${m.name.toUpperCase()} [${Math.abs(m.peakM)}m] (${m.rangeNm.toFixed(1)} NM)`
+              : `▲ ${m.name.toUpperCase()} (${m.rangeNm.toFixed(1)} NM)`;
+            ctx.font = '600 9px Arial, Helvetica, sans-serif';
+            const tw = Math.min(220, ctx.measureText(tag).width + 12);
+            const tx = clamp(m.x - tw / 2, 10, w - tw - 10);
+            const ty = clamp(m.y - 26, 68, h - 56);
+            drawPanel(tx, ty, tw, 16, 'rgba(6, 17, 26, 0.72)');
+            const col = m.kind === 'base' ? '#7ce0f4' : m.isShoal ? '#f0c27b' : '#c7d9c2';
+            drawText(tag, tx + 6, ty + 8, 8.5, col, 700);
+            ctx.strokeStyle = col;
+            ctx.lineWidth = 0.8;
+            ctx.beginPath();
+            ctx.moveTo(m.x, ty + 16);
+            ctx.lineTo(m.x, m.y - 3);
+            ctx.stroke();
+          }
         }
-        for (let y = 0; y < h; y += 34) {
-          ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke();
+
+        // 2. Draw 3D-Projected Contact Target Brackets & Distance / Bearing Callouts
+        for (const m of markers) {
+          if (m.kind !== 'contact') continue;
+          const c = m.contact;
+          const isSelected = world.selectedContactId === c.id;
+          const prof = c.classifiedAs ? window.ACOUSTIC_PROFILES[c.classifiedAs] : null;
+          const classStr = prof ? prof.shortName : 'UNCLASSIFIED';
+          const yds = Math.round(m.rangeNm * 2025.37);
+
+          let bracketCol = '#f0c77f';
+          if (prof) {
+            if (prof.allegiance === 'HOSTILE') bracketCol = '#ff5c5c';
+            else if (prof.allegiance === 'FRIENDLY') bracketCol = '#5ce1ff';
+            else if (prof.allegiance === 'BIOLOGIC') bracketCol = '#a8ff60';
+            else bracketCol = '#68e89b';
+          }
+
+          // Target Lock Box around 3D vessel
+          const boxSize = clamp(44 / Math.sqrt(Math.max(0.5, m.rangeNm)), 14, 42);
+          ctx.strokeStyle = bracketCol;
+          ctx.lineWidth = isSelected ? 1.8 : 1.1;
+          ctx.strokeRect(m.x - boxSize / 2, m.y - boxSize / 2, boxSize, boxSize);
+
+          const label1 = `${c.designation} [${classStr}]`;
+          const label2 = `RNG ${m.rangeNm.toFixed(1)} NM (${yds}y) | BRG ${Math.round(m.bearing).toString().padStart(3, '0')}° | ${Math.round(c.speedKts)} KT`;
+          ctx.font = '700 9px Arial, Helvetica, sans-serif';
+          const boxW = Math.max(ctx.measureText(label1).width, ctx.measureText(label2).width) + 14;
+          const lx = clamp(m.x - boxW / 2, 10, w - boxW - 10);
+          const ly = clamp(m.y - boxSize / 2 - 34, 66, h - 68);
+
+          drawPanel(lx, ly, boxW, 28, isSelected ? 'rgba(20, 34, 18, 0.88)' : 'rgba(6, 18, 29, 0.82)');
+          drawText(label1, lx + 6, ly + 8, 9, bracketCol, 700);
+          drawText(label2, lx + 6, ly + 20, 8.5, '#d2e2ec', 600);
+
+          ctx.strokeStyle = bracketCol;
+          ctx.lineWidth = 0.9;
+          ctx.beginPath();
+          ctx.moveTo(m.x, ly + 28);
+          ctx.lineTo(m.x, m.y - boxSize / 2);
+          ctx.stroke();
+        }
+
+        // 3. Top Instrument Bar + Azimuth Compass Tape + 360° Surroundings Mini-Radar Strip
+        drawPanel(0, 0, w, 30, 'rgba(5, 15, 24, 0.88)');
+        drawText(
+          isOutside3D ? 'EXTERNAL 3D HULL & SEABED CAMERA' : (thermal ? '3D FLIR  /  WHITE HOT' : '3D EO  /  OPTICAL + DEM RELIEF'),
+          14, 15, 10, thermal ? '#e6e9e2' : '#b8d0df', 700
+        );
+        drawText(isOutside3D ? `ORBIT ${Math.round(window.Periscope3D.orbitDistance)}m` : `MAG ${zoom.toFixed(1)}×`, w * 0.5, 15, 10, '#e4c58f', 700, 'center');
+        drawText(`AN/BVS-1     ${clock}`, w - 14, 15, 9, '#a8becc', 600, 'right');
+
+        // Azimuth Tape (y = 30..56)
+        drawPanel(0, 30, w, 26, 'rgba(8, 20, 30, 0.72)');
+        const centerBrg = isOutside3D ? ((sub.heading + window.Periscope3D.orbitYaw) % 360) : this.scopeBearing;
+        const halfTicks = 6;
+        for (let tick = -halfTicks; tick <= halfTicks; tick++) {
+          const x = w / 2 + (tick / halfTicks) * (w * 0.42);
+          const major = tick % 2 === 0;
+          ctx.strokeStyle = major ? 'rgba(191, 213, 224, 0.85)' : 'rgba(160, 190, 205, 0.48)';
+          ctx.lineWidth = major ? 1.1 : 0.7;
+          ctx.beginPath();
+          ctx.moveTo(x, 45 - (major ? 7 : 4));
+          ctx.lineTo(x, 51);
+          ctx.stroke();
+          if (major) {
+            const tickBearing = Math.round((centerBrg + tick * (fovDeg / 12) + 360) % 360);
+            drawText(String(tickBearing).padStart(3, '0') + '°', x, 36, 8, '#b4c8d4', 600, 'center');
+          }
+        }
+        ctx.strokeStyle = '#e3bd77';
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        ctx.moveTo(w / 2, 31); ctx.lineTo(w / 2, 55);
+        ctx.stroke();
+
+        // 360° Surroundings Situational Awareness Strip (y = 56..66) showing all land & contacts around 000°..359°
+        drawPanel(0, 56, w, 11, 'rgba(4, 12, 20, 0.80)');
+        if (terrainProfile && Array.isArray(terrainProfile.rays)) {
+          for (const r of terrainProfile.rays) {
+            if (!r || !r.hasLand) continue;
+            const rx = (r.bearing / 360) * w;
+            ctx.fillStyle = 'rgba(218, 168, 92, 0.65)';
+            ctx.fillRect(rx - 2, 58, 4, 7);
+          }
+        }
+        for (const c of world.contacts || []) {
+          if (c.sunk) continue;
+          const b = window.Bathymetry.bearingDeg(sub.lat, sub.lon, c.lat, c.lon);
+          const cx = (b / 360) * w;
+          ctx.fillStyle = c.profile && c.profile.allegiance === 'HOSTILE' ? '#ff4d4d' : '#5ce1ff';
+          ctx.fillRect(cx - 2, 57, 4, 9);
+        }
+        // Current look bearing indicator on 360° strip
+        const lookX = (((centerBrg % 360) + 360) % 360 / 360) * w;
+        ctx.strokeStyle = '#ffe1a2';
+        ctx.strokeRect(lookX - 6, 56.5, 12, 10);
+
+        // 4. Bottom Line-of-Sight (LOS) Stadimeter Rangefinder & Surroundings Bar
+        drawPanel(0, h - 30, w, 30, 'rgba(5, 15, 24, 0.92)');
+        const los = window.Periscope3D.lastCenterRayInfo;
+        let losText = `LOS BRG ${String(Math.round(centerBrg)).padStart(3, '0')}°  |  OPEN SEA HORIZON 4.7 NM  |  SEAFLOOR ${world.currentSeafloorM || '--'}m`;
+        let losColor = '#a9d4c9';
+
+        if (los && los.lockedContact) {
+          const lc = los.lockedContact;
+          const yds = Math.round(lc.rangeNm * 2025.37);
+          losText = `LOS TARGET: ${lc.contact.designation}  |  RNG ${lc.rangeNm.toFixed(2)} NM (${yds} YDS)  |  BRG ${Math.round(lc.bearing).toString().padStart(3, '0')}°  |  CRS ${Math.round(lc.contact.heading)}° @ ${Math.round(lc.contact.speedKts)} KT`;
+          losColor = '#ffe1a2';
+        } else if (los && los.landRay) {
+          const landNm = (los.landRay.rangeKm / 1.852).toFixed(1);
+          losText = `LOS TERRAIN: COASTLINE / LAND AT ${landNm} NM (${los.landRay.rangeKm.toFixed(1)} KM)  |  PEAK ELEV ~${Math.round(los.landRay.elevationM)}m  |  SEAFLOOR ${world.currentSeafloorM}m`;
+          losColor = '#e4c58f';
+        }
+
+        drawText(losText, 14, h - 15, 9.5, losColor, 700);
+        drawText(`KEEL ${sub.depthM.toFixed(1)}m  |  HDG ${String(Math.round(sub.heading)).padStart(3, '0')}°`, w - 14, h - 15, 9, '#c5d4dc', 600, 'right');
+        drawCornerFrame('rgba(201, 220, 231, 0.50)');
+      } else if (!raised) {
+        if (is3DActive) {
+          ctx.clearRect(0, 0, w, h);
+        } else {
+          const bg = ctx.createLinearGradient(0, 0, w, h);
+          bg.addColorStop(0, '#1b2b39');
+          bg.addColorStop(0.52, '#0e1b28');
+          bg.addColorStop(1, '#07111b');
+          ctx.fillStyle = bg;
+          ctx.fillRect(0, 0, w, h);
         }
 
         drawPanel(18, 18, w - 36, 34, 'rgba(5, 13, 21, 0.68)');
         drawText('AN/BVS-1  /  PHOTONICS SENSOR CONTROL', 31, 35, 10, '#a9c0d0', 700);
         drawText(clock, w - 31, 35, 10, '#91aabd', 600, 'right');
 
-        const boxW = Math.min(440, w - 48);
+        const boxW = Math.min(460, w - 48);
         const boxH = 154;
         const bx = (w - boxW) / 2;
         const by = (h - boxH) / 2 - 2;
@@ -1141,16 +1285,16 @@ class StationRenderers {
           interlocked ? '#e2b16b' : '#d3e0e9', 700, 'center');
         drawText(
           interlocked
-            ? 'MAST DEPLOYMENT INHIBITED  /  REDUCE DEPTH TO 20.0 m OR LESS'
-            : 'OPTICAL CHANNEL STANDBY  /  RAISE MAST TO ACQUIRE LIVE PICTURE',
+            ? 'REDUCE DEPTH TO <= 20.0 m TO RAISE MAST, OR CLICK [OUTSIDE 3D] FOR EXTERNAL HULL VIEW'
+            : 'OPTICAL CHANNEL STANDBY  /  CLICK [RAISE MAST] OR [OUTSIDE 3D] TO VIEW SURROUNDINGS',
           gx, by + 109, 9, '#8da9ba', 600, 'center'
         );
-        drawText(`OWN DEPTH  ${sub.depthM.toFixed(1)} m`, gx, by + 133, 10,
+        drawText(`OWN DEPTH  ${sub.depthM.toFixed(1)} m  |  SEAFLOOR  ${world.currentSeafloorM || '--'} m`, gx, by + 133, 10,
           interlocked ? '#e2b16b' : '#a8c1cf', 700, 'center');
 
         drawPanel(18, h - 37, w - 36, 22, 'rgba(5, 13, 21, 0.72)');
-        drawText('EO SENSOR  /  CHANNEL OFFLINE', 30, h - 26, 9, '#8299a9', 700);
-        drawText('STABILIZATION: STANDBY', w - 30, h - 26, 9, '#8299a9', 600, 'right');
+        drawText('SUBSURFACE 3D CAMERA STANDBY', 30, h - 26, 9, '#8299a9', 700);
+        drawText('TIP: USE [OUTSIDE 3D] AT ANY DEPTH', w - 30, h - 26, 9, '#e0bd80', 600, 'right');
         drawCornerFrame('rgba(133, 164, 185, 0.45)');
       } else {
         const daylight = clamp(Math.sin(((simHours - 6) / 12) * Math.PI), 0, 1);

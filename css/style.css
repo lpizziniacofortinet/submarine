@@ -1070,7 +1070,14 @@ select.mil-select, input.mil-input {
   touch-action: none;
 }
 .scope-console.scope-3d-active .scope-display-3d { display: block; }
-.scope-console.scope-3d-active #periscope-canvas { display: none; }
+.scope-console.scope-3d-active #periscope-canvas {
+  display: block;
+  position: absolute;
+  inset: 0;
+  z-index: 3;
+  background: transparent;
+  pointer-events: none;
+}
 .scope-console.scope-3d-active .scope-viewport { isolation: isolate; }
 .scope-console.scope-3d-active .scope-live-mark { z-index: 5; }
 .scope-3d-reticle {
