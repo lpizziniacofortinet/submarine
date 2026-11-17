@@ -503,10 +503,12 @@ class StationRenderers {
     const w = wfCanvas.width;
     const h = wfCanvas.height;
 
-    // Draw top compass bearing ruler (26px high) + waterfall below
+    // Draw top compass bearing ruler (28px high) + waterfall below
     ctx.fillStyle = '#040a06';
     ctx.fillRect(0, 0, w, 28);
-    ctx.drawImage(this.waterfallBuffer, 0, 28, w, h - 28);
+    if (w > 0 && h > 28) {
+      ctx.drawImage(this.waterfallBuffer, 0, 28, w, h - 28);
+    }
 
     // Bearing ticks & labels every 30°
     ctx.strokeStyle = '#1e422b';

@@ -13,7 +13,8 @@ class BathymetryService {
     this.pendingRequests = new Set();
     this.localProxyUnavailable =
       typeof window !== 'undefined' &&
-      (window.location.protocol === 'file:' || window.location.hostname.endsWith('github.io'));
+      Boolean(window.location) &&
+      (window.location.protocol === 'file:' || (window.location.hostname || '').endsWith('github.io'));
     this.onlineStatus = 'LIVE MEDITERRANEAN CHARTS + ETOPO1';
 
     // Major Mediterranean Landmasses, Islands, Shallow Banks & Deep Trenches

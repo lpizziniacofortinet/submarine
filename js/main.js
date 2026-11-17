@@ -153,9 +153,19 @@ class SubmarineWorld {
           1,
           Math.ceil(this.simulationClock.maxFrameDeltaSec / this.simulationClock.fixedStepSec)
         );
-        this.simulationClock.advance(rawDt * compression, (fixedDt) => {
-          this.stepSimulation(fixedDt, fixedDt / compression);
-        });
+        try {
+          this.simulationClock.advance(rawDt * compression, (fixedDt) => {
+            this.stepSimulation(fixedDt, fixedDt / compression);
+          });
+        } catch (err) {
+          console.error('Simulation loop error:', err);
+        }
+      } else {
+        try {
+          this.renderActiveStation();
+        } catch (err) {
+          console.error('Station render error:', err);
+        }
       }
       requestAnimationFrame(loop);
     };
@@ -1379,6 +1389,7 @@ class SubmarineWorld {
     if (stationName === 'tactical' && window.Stations.leafletMap) {
       setTimeout(() => window.Stations.leafletMap.invalidateSize(), 50);
     }
+    this.renderActiveStation();
   }
 
   bindUIEvents() {
