@@ -7,6 +7,7 @@ A browser-based, retro CRT-style submarine simulation inspired by classic naval 
 The project is built with HTML5, CSS, Canvas, and vanilla JavaScript. It has no build step or game-engine dependency.
 
 > **New to the simulator?** Start with the [Captain's Tactical & Engineering Guide](./HOWTO.md).
+> **Future plans & multiplayer architecture:** See the [Architecture & Evolution Roadmap](./ROADMAP.md).
 
 ## Audio assets & licensing
 - **Periscope coastline fallback:** Natural Earth 1:110m Land (public domain), cropped to the Mediterranean and Atlantic approaches, plus a small local correction around the Provençal coast near Toulon where the small-scale dataset generalizes the shoreline. Copernicus DEM GLO-90 remains the preferred elevation source when online; the local profile keeps a visible approximation available during loading or offline use.
