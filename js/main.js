@@ -390,7 +390,8 @@ class SubmarineWorld {
         this.reactor.status === 'SCRAMMED',
         this.getSelectedContact(),
         activeTorps,
-        rawDt
+        rawDt,
+        this.ownSub.heading
       );
     }
 

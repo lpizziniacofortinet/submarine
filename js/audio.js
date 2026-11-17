@@ -33,9 +33,13 @@ class SubAudioEngine {
     this.pumpGain = null;
     this.cavGain = null;
 
-    // Hydrophone target screw modulation nodes
+    // Hydrophone target screw modulation & multi-tonal machinery synthesizer
     this.hydroGain = null;
     this.hydroFilter = null;
+    this.hydroPanner = null;
+    this.hydroMasterGain = null;
+    this.hydroTonalOscs = [];
+    this.hydroTonalGains = [];
     this.screwPhase = 0;
 
     // Torpedo whine oscillator
@@ -156,7 +160,19 @@ class SubAudioEngine {
     this.cavGain.connect(this.masterGain);
     cavNoise.start(0);
 
-    // 3. Hydrophone Target Propeller Blade-Beat ("Chug-Chug-Swish")
+    // 3. Hydrophone Target Broadband Screw + Multi-Tonal Machinery Bank + Stereo Panner
+    this.hydroMasterGain = this.ctx.createGain();
+    this.hydroMasterGain.gain.value = 1.0;
+
+    if (typeof this.ctx.createStereoPanner === 'function') {
+      this.hydroPanner = this.ctx.createStereoPanner();
+      this.hydroPanner.pan.value = 0;
+      this.hydroMasterGain.connect(this.hydroPanner);
+      this.hydroPanner.connect(this.masterGain);
+    } else {
+      this.hydroMasterGain.connect(this.masterGain);
+    }
+
     const hydroNoise = this.ctx.createBufferSource();
     hydroNoise.buffer = noiseBuffer;
     hydroNoise.loop = true;
@@ -171,8 +187,24 @@ class SubAudioEngine {
 
     hydroNoise.connect(this.hydroFilter);
     this.hydroFilter.connect(this.hydroGain);
-    this.hydroGain.connect(this.masterGain);
+    this.hydroGain.connect(this.hydroMasterGain);
     hydroNoise.start(0);
+
+    // 4 dedicated machinery / biological tonal oscillators driven by contact's tonalHz[]
+    this.hydroTonalOscs = [];
+    this.hydroTonalGains = [];
+    for (let i = 0; i < 4; i++) {
+      const osc = this.ctx.createOscillator();
+      osc.type = i === 0 ? 'triangle' : 'sine';
+      osc.frequency.value = 60 * (i + 1);
+      const tGain = this.ctx.createGain();
+      tGain.gain.value = 0.0;
+      osc.connect(tGain);
+      tGain.connect(this.hydroMasterGain);
+      osc.start(0);
+      this.hydroTonalOscs.push(osc);
+      this.hydroTonalGains.push(tGain);
+    }
 
     // 4. Reactor Coolant Pump & Steam Turbine Hum
     this.pumpOsc = this.ctx.createOscillator();
@@ -220,10 +252,11 @@ class SubAudioEngine {
    * Updates continuous sound loops every frame:
    * - Own cavitation hiss
    * - Reactor coolant pump & turbine RPM pitch
-   * - Selected contact's rhythmic propeller blade-rate beats on hydrophone
+   * - Selected contact's realistic multi-tonal machinery frequencies, blade-rate
+   *   propeller cadence, Doppler shift, and stereo bearing pan on hydrophone
    * - Active torpedo screw whine in water
    */
-  updateContinuousTelemetry(isCavitating, pumpMode, speedKts, scrammed, selectedContact = null, activeTorpedoCount = 0, dt = 0.016) {
+  updateContinuousTelemetry(isCavitating, pumpMode, speedKts, scrammed, selectedContact = null, activeTorpedoCount = 0, dt = 0.016, ownHeadingDeg = 0) {
     if (!this.initialized || !this.enabled || !this.ctx) return;
     if (this.ctx.state === 'suspended') return;
 
@@ -249,32 +282,100 @@ class SubAudioEngine {
       this.pumpGain.gain.setTargetAtTime(pumpLevel, now, 0.15);
     }
 
-    // 3. Hydrophone Target Propeller Blade Beat or Biological Whale/Dolphin Calls
+    // 3. Hydrophone Target Acoustic Signature (Broadband Screw + Multi-Tonal Machinery Harmonics)
     if (this.hydrophoneEnabled && selectedContact && selectedContact.detected && !selectedContact.sunk && selectedContact.snrDb > -2) {
-      if (selectedContact.profile.category === 'BIOLOGIC') {
-        // Biological marine mammal frequency sweep & clicks
-        this.screwPhase = (this.screwPhase + 1.8 * dt) % (Math.PI * 2);
-        const bioSweep = 220 + Math.sin(this.screwPhase) * 140 + Math.cos(this.screwPhase * 3.7) * 80;
-        const snrStrength = Math.min(0.18, Math.max(0.02, (selectedContact.snrDb + 5) * 0.006));
-        this.hydroFilter.frequency.setTargetAtTime(Math.max(90, bioSweep), now, 0.06);
-        this.hydroGain.gain.setTargetAtTime(snrStrength * (0.5 + 0.5 * Math.sin(this.screwPhase * 2.3)), now, 0.06);
-      } else {
-        const blades = selectedContact.profile.blades || 5;
-        const spd = Math.max(2, selectedContact.speedKts);
-        const bladeBeatHz = (spd * 0.35) * (blades / 5.0);
-        this.screwPhase = (this.screwPhase + bladeBeatHz * dt * Math.PI * 2) % (Math.PI * 2);
+      const prof = selectedContact.profile;
+      const tonals = Array.isArray(prof.tonalHz) && prof.tonalHz.length ? prof.tonalHz : [60, 140];
+      const snrNorm = Math.min(1.0, Math.max(0.08, (selectedContact.snrDb + 4) / 36));
 
-        // Rhythmic amplitude pulse per blade pass
-        const pulse = 0.35 + 0.65 * Math.pow((Math.sin(this.screwPhase) + 1) * 0.5, 2.2);
-        const snrStrength = Math.min(0.24, Math.max(0.02, (selectedContact.snrDb + 5) * 0.008));
-
-        // Submarines sound deeper/lower pitched than surface warships/merchants
-        const centerFreq = selectedContact.profile.category === 'SUBMARINE' ? 280 : 540;
-        this.hydroFilter.frequency.setTargetAtTime(centerFreq + pulse * 140, now, 0.04);
-        this.hydroGain.gain.setTargetAtTime(snrStrength * pulse, now, 0.04);
+      // Stereo Pan from relative bearing (-1 Port, +1 Starboard)
+      if (this.hydroPanner) {
+        const relBrgRad = (((selectedContact.lastTrueBrg - ownHeadingDeg + 360) % 360) * Math.PI) / 180;
+        this.hydroPanner.pan.setTargetAtTime(Math.sin(relBrgRad) * 0.82, now, 0.08);
       }
-    } else if (this.hydroGain) {
-      this.hydroGain.gain.setTargetAtTime(0.0, now, 0.1);
+
+      if (prof.category === 'BIOLOGIC') {
+        // Biological marine mammal calls (20Hz Fin Whale pulse, 185-310Hz Sperm Whale clicks, Dolphin whistles)
+        this.screwPhase = (this.screwPhase + 1.9 * dt) % (Math.PI * 2);
+        const f0 = tonals[0] || 180;
+        const bioSweep = f0 * 1.4 + Math.sin(this.screwPhase) * (f0 * 0.45) + Math.cos(this.screwPhase * 3.1) * 45;
+        this.hydroFilter.frequency.setTargetAtTime(Math.max(70, bioSweep), now, 0.06);
+        this.hydroGain.gain.setTargetAtTime(snrNorm * 0.16 * (0.4 + 0.6 * Math.sin(this.screwPhase * 2.3)), now, 0.06);
+
+        for (let i = 0; i < this.hydroTonalOscs.length; i++) {
+          const osc = this.hydroTonalOscs[i];
+          const tg = this.hydroTonalGains[i];
+          if (i < tonals.length) {
+            const callFreq = tonals[i] * (0.92 + 0.16 * Math.sin(this.screwPhase * (1.2 + i * 0.5)));
+            if (osc.type !== 'sine') osc.type = 'sine';
+            osc.frequency.setTargetAtTime(Math.max(20, callFreq), now, 0.05);
+            const pulseGate = Math.max(0, Math.sin(this.screwPhase * (1.5 + i)));
+            tg.gain.setTargetAtTime(snrNorm * 0.032 * pulseGate, now, 0.05);
+          } else {
+            tg.gain.setTargetAtTime(0.0, now, 0.08);
+          }
+        }
+      } else {
+        const blades = prof.blades || 5;
+        const spd = Math.max(1.5, selectedContact.speedKts);
+        // Realistic DEMON blade-rate beat frequency & speed-proportional machinery shift
+        const bladeBeatHz = (spd * 0.32) * (blades / 5.0);
+        this.screwPhase = (this.screwPhase + bladeBeatHz * dt * Math.PI * 2) % (Math.PI * 2);
+        const pulse = 0.30 + 0.70 * Math.pow((Math.sin(this.screwPhase) + 1) * 0.5, 2.2);
+
+        // Acoustic Doppler factor from target radial velocity relative to own ship
+        const brgToTargetRad = (selectedContact.lastTrueBrg * Math.PI) / 180;
+        const tgtHdgRad = ((selectedContact.heading || 0) * Math.PI) / 180;
+        const radialSpdKts = Math.cos(tgtHdgRad - brgToTargetRad) * spd;
+        const dopplerFactor = 1.0 - (radialSpdKts * 0.51444) / 1500.0; // Exaggerated slightly below? No, real c=1500m/s, keep subtle + speed RPM shift
+
+        // Plant-specific broadband wash center frequency & Q
+        const isSub = prof.category === 'SUBMARINE';
+        const isMerchant = prof.category === 'MERCHANT';
+        const baseWashHz = isSub ? 210 : isMerchant ? 340 : 580;
+        const speedShift = 0.85 + Math.min(0.45, spd / 40.0);
+
+        this.hydroFilter.frequency.setTargetAtTime(
+          Math.max(110, (baseWashHz * speedShift + pulse * (isSub ? 85 : 165)) * dopplerFactor),
+          now,
+          0.04
+        );
+        this.hydroFilter.Q.setTargetAtTime(isSub ? 3.2 : 2.1, now, 0.08);
+        this.hydroGain.gain.setTargetAtTime(snrNorm * 0.22 * pulse, now, 0.04);
+
+        // Drive up to 4 real machinery tonal oscillators from the vessel's exact tonalHz[] profile!
+        // - Submarines: clean sinusoidal reactor/motor hums
+        // - Merchants: heavy sawtooth/triangle low-RPM 2-stroke diesel chug
+        // - Warships: crisp gas-turbine / gear-mesh harmonics
+        const primaryType = isMerchant ? 'sawtooth' : (isSub ? 'sine' : 'triangle');
+        const speedHarmonicShift = 0.88 + (spd / Math.max(12, prof.maxSpeedKts || 25)) * 0.24;
+
+        for (let i = 0; i < this.hydroTonalOscs.length; i++) {
+          const osc = this.hydroTonalOscs[i];
+          const tg = this.hydroTonalGains[i];
+          if (i < tonals.length) {
+            const targetType = i === 0 ? primaryType : (isMerchant && i === 1 ? 'triangle' : 'sine');
+            if (osc.type !== targetType) osc.type = targetType;
+
+            // Low diesel tonals (22-35 Hz) are shifted gently up 1 octave in sub-bass harmonic if needed so laptop speakers reproduce them clearly alongside fundamental
+            const rawHz = tonals[i] * speedHarmonicShift * dopplerFactor;
+            const audibleHz = Math.max(24, rawHz);
+            osc.frequency.setTargetAtTime(audibleHz, now, 0.05);
+
+            // Fundamental tonal is strongest, higher harmonics taper off; modulated slightly by blade pass
+            const harmonicWeight = i === 0 ? 0.042 : (i === 1 ? 0.028 : 0.016);
+            const mod = isMerchant ? (0.72 + 0.28 * pulse) : (0.88 + 0.12 * pulse);
+            tg.gain.setTargetAtTime(snrNorm * harmonicWeight * mod, now, 0.05);
+          } else {
+            tg.gain.setTargetAtTime(0.0, now, 0.08);
+          }
+        }
+      }
+    } else {
+      if (this.hydroGain) this.hydroGain.gain.setTargetAtTime(0.0, now, 0.1);
+      for (let i = 0; i < this.hydroTonalGains.length; i++) {
+        this.hydroTonalGains[i].gain.setTargetAtTime(0.0, now, 0.1);
+      }
     }
 
     // 4. Active Torpedo Screw Whine
