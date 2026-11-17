@@ -1,5 +1,7 @@
 # SSN-774 Submarine Simulator
 
+![SSN-774 Virginia — Mediterranean Patrol](assets/cover.png)
+
 A browser-based, retro CRT-style submarine simulation inspired by classic naval games such as *Jane's 688(I) Hunter/Killer*, *Sub Command*, and *Red Storm Rising*.
 
 The project is built with HTML5, CSS, Canvas, and vanilla JavaScript. It has no build step or game-engine dependency.
