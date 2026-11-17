@@ -513,7 +513,10 @@
       const raised = Boolean(sub.periscopeRaised && sub.depthM <= 20.5);
       const thermal = Boolean(stations && stations.scopeThermal);
       const zoom = stations && stations.scopeZoom ? stations.scopeZoom : 1.5;
-      let eye, target, fov, fogFar;
+      const visibilityKm = Math.max(1, Number(stations && stations.scopeVisibilityKm) || 55);
+      const fogNear = visibilityKm * 180;
+      const fogFar = visibilityKm * 1000;
+      let eye, target, fov;
       if (this.mode === 'outside') {
         const orbit = radians(sub.heading + this.orbitYaw);
         const pitch = radians(this.orbitPitch);
@@ -526,7 +529,6 @@
         ];
         target = [0, targetY, 0];
         fov = radians(52);
-        fogFar = 42000;
       } else {
         const bearing = radians(stations ? stations.scopeBearing : sub.heading);
         // With the mast retracted, look upward through the water from the real hull depth.
@@ -535,7 +537,6 @@
         eye = [0, cameraY, 0];
         target = [Math.sin(bearing) * 1000, cameraY + pitch * 1000, Math.cos(bearing) * 1000];
         fov = radians(48 / zoom);
-        fogFar = 21000;
         if (!raised) this.canvas.style.background = 'linear-gradient(180deg, #061d2b 0%, #0a3143 55%, #03111b 100%)';
       }
 
@@ -556,24 +557,24 @@
 
       if (this.mode === 'periscope') {
         this.draw(water, viewProjection, eye, {
-          fog, fogNear: 3000, fogFar, alpha: raised ? 1 : 0.38, thermal
+          fog, fogNear, fogFar, alpha: raised ? 1 : 0.38, thermal
         });
         this.draw(this.terrainCache, viewProjection, eye, {
-          fog, fogNear: 2500, fogFar, alpha: 1, thermal
+          fog, fogNear, fogFar, alpha: 1, thermal
         });
         this.draw(objects, viewProjection, eye, {
-          fog, fogNear: 2500, fogFar, alpha: 1, thermal
+          fog, fogNear, fogFar, alpha: 1, thermal
         });
       } else {
         this.draw(this.terrainCache, viewProjection, eye, {
-          fog, fogNear: 8000, fogFar, alpha: 1, thermal: false
+          fog, fogNear, fogFar, alpha: 1, thermal: false
         });
         this.draw(objects, viewProjection, eye, {
-          fog, fogNear: 9000, fogFar, alpha: 1, thermal: false
+          fog, fogNear, fogFar, alpha: 1, thermal: false
         });
         gl.depthMask(false);
         this.draw(water, viewProjection, eye, {
-          fog, fogNear: 3000, fogFar: 50000, alpha: 0.46, thermal: false
+          fog, fogNear, fogFar, alpha: 0.46, thermal: false
         });
         gl.depthMask(true);
       }
