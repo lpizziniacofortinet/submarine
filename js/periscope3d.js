@@ -309,6 +309,10 @@
         liveMark.style.display = 'flex';
         liveMark.lastChild.textContent = this.mode === 'outside' ? ' EXTERNAL CAMERA' : ' EO SENSOR';
       }
+      const systemReadout = this.canvas && this.canvas.parentElement.parentElement.querySelector('.scope-system-readout strong');
+      if (systemReadout) systemReadout.textContent = this.mode === 'outside' ? 'DRAG ORBIT / WHEEL ZOOM' : 'EO / STABILIZED';
+      const bearingLabel = this.canvas && this.canvas.parentElement.parentElement.querySelector('.scope-bearing-readout span');
+      if (bearingLabel) bearingLabel.textContent = this.mode === 'outside' ? 'EXTERNAL CAMERA' : 'TRUE BEARING';
     }
 
     geographicOffset(sub, lat, lon) {
@@ -428,7 +432,7 @@
         const subY = -Math.max(0, sub.depthM) + 4.5;
         addVessel(out, 0, subY, 0, sub.heading, 116, 10.5, 'submarine', [0.12, 0.17, 0.19]);
         if (sub.periscopeRaised && sub.depthM <= 20.5) {
-          const mastTop = subY + 4.7 + 2.0;
+          const mastTop = 5.5;
           const mastBottom = subY + 6.5;
           addBox(out, 0, (mastTop + mastBottom) / 2, 0, 0.35, Math.max(0.5, mastTop - mastBottom), 0.35,
             radians(sub.heading), [0.23, 0.29, 0.31]);
@@ -582,8 +586,14 @@
       const reticle = this.canvas.parentElement.querySelector('.scope-3d-reticle');
       if (reticle) reticle.style.display = this.mode === 'periscope' && raised ? 'block' : 'none';
       const scopeStatus = document.getElementById('scope-terrain-status');
-      if (scopeStatus && this.mode === 'outside') {
-        scopeStatus.textContent = '3D WORLD: LIVE GEO / CONTACT DATA';
+      if (scopeStatus) {
+        if (this.mode === 'outside') {
+          scopeStatus.textContent = '3D WORLD: LIVE GEO / CONTACT DATA';
+        } else {
+          scopeStatus.textContent = raised
+            ? '3D TERRAIN: LOCAL LANDMASK / RELIEF MODEL'
+            : 'MAST RETRACTED: SUBSURFACE VIEW';
+        }
         scopeStatus.dataset.state = 'ready';
       }
     }
