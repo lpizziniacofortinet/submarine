@@ -448,7 +448,51 @@
     };
   }
 
-  function addVessel(out, x, y, z, headingDeg, length, beam, heightScale, kind, tint, speedKts = 10) {
+  function appendGLBModel(out, modelKey, x, y, z, headingDeg, width, height, length, tintBlend = null) {
+    if (typeof window === 'undefined' || !window.GLBModelLibrary) return false;
+    const model = window.GLBModelLibrary.getModel(modelKey);
+    if (!model || !model.positions || model.positions.length === 0) return false;
+
+    const yaw = radians(headingDeg);
+    const sinY = Math.sin(yaw);
+    const cosY = Math.cos(yaw);
+    const pos = model.positions;
+    const norm = model.normals;
+    const col = model.colors;
+
+    for (let i = 0; i < pos.length; i += 3) {
+      const lx = pos[i] * width;
+      const ly = pos[i + 1] * height;
+      const lz = pos[i + 2] * length;
+      out.positions.push(
+        x + lx * cosY + lz * sinY,
+        y + ly,
+        z - lx * sinY + lz * cosY
+      );
+
+      const nkx = norm[i];
+      const nky = norm[i + 1];
+      const nkz = norm[i + 2];
+      out.normals.push(
+        nkx * cosY + nkz * sinY,
+        nky,
+        -nkx * sinY + nkz * cosY
+      );
+
+      if (tintBlend) {
+        out.colors.push(
+          col[i] * 0.65 + tintBlend[0] * 0.35,
+          col[i + 1] * 0.65 + tintBlend[1] * 0.35,
+          col[i + 2] * 0.65 + tintBlend[2] * 0.35
+        );
+      } else {
+        out.colors.push(col[i], col[i + 1], col[i + 2]);
+      }
+    }
+    return true;
+  }
+
+  function addVessel(out, x, y, z, headingDeg, length, beam, heightScale, kind, tint, speedKts = 10, modelKey = null) {
     const yaw = radians(headingDeg);
     const pt = (lx, ly, lz) => localToWorld(x, y, z, lx, ly, lz, yaw);
 
@@ -464,50 +508,58 @@
     const freeboard = (kind === 'submarine' ? 2.2 : 5.2) * heightScale;
     const draft = (kind === 'submarine' ? 4.8 : 4.2) * heightScale;
 
-    const sections = [
-      { z: -length * 0.50, w: beam * 0.14, top: freeboard * 0.75, bottom: -draft * 0.65 },
-      { z: -length * 0.30, w: beam * 0.46, top: freeboard * 0.92, bottom: -draft },
-      { z: length * 0.20, w: beam * 0.50, top: freeboard, bottom: -draft },
-      { z: length * 0.44, w: beam * 0.20, top: freeboard * 0.95, bottom: -draft * 0.65 },
-      { z: length * 0.50, w: beam * 0.03, top: freeboard * 1.05, bottom: -draft * 0.30 }
-    ];
-
-    const hull = tint || [0.22, 0.29, 0.33];
-    const deck = [
-      clamp(hull[0] * 1.25, 0, 1),
-      clamp(hull[1] * 1.25, 0, 1),
-      clamp(hull[2] * 1.22, 0, 1)
-    ];
-
-    for (let i = 0; i < sections.length - 1; i++) {
-      const a = sections[i], b = sections[i + 1];
-      addQuad(out, pt(-a.w, a.top, a.z), pt(-b.w, b.top, b.z), pt(-b.w, b.bottom, b.z), pt(-a.w, a.bottom, a.z), hull);
-      addQuad(out, pt(b.w, b.top, b.z), pt(a.w, a.top, a.z), pt(a.w, a.bottom, a.z), pt(b.w, b.bottom, b.z), hull);
-      addQuad(out, pt(-a.w, a.bottom, a.z), pt(-b.w, b.bottom, b.z), pt(b.w, b.bottom, b.z), pt(a.w, a.bottom, a.z), [0.06, 0.10, 0.13]);
-      addQuad(out, pt(-a.w, a.top, a.z), pt(a.w, a.top, a.z), pt(b.w, b.top, b.z), pt(-b.w, b.top, b.z), deck);
+    let usedGLB = false;
+    if (modelKey) {
+      const modelHeight = (kind === 'submarine' ? 14.5 : 18.0) * heightScale;
+      usedGLB = appendGLBModel(out, modelKey, x, y + 1.5 * heightScale, z, headingDeg, beam, modelHeight, length, tint);
     }
 
-    if (kind === 'submarine') {
-      const sailCenter = pt(0, freeboard + 3.4 * heightScale, length * 0.08);
-      addBox(out, sailCenter[0], sailCenter[1], sailCenter[2], beam * 0.24, 6.2 * heightScale, length * 0.18, yaw, [0.18, 0.24, 0.27]);
-      const planesCenter = pt(0, freeboard + 2.8 * heightScale, length * 0.10);
-      addBox(out, planesCenter[0], planesCenter[1], planesCenter[2], beam * 0.72, 0.45 * heightScale, length * 0.04, yaw, [0.22, 0.28, 0.31]);
-      const finCenter = pt(0, freeboard + 2.2 * heightScale, -length * 0.44);
-      addBox(out, finCenter[0], finCenter[1], finCenter[2], beam * 0.08, 4.4 * heightScale, length * 0.07, yaw, [0.16, 0.22, 0.25]);
-    } else if (kind === 'merchant') {
-      const aftBridge = pt(0, freeboard + 5.5 * heightScale, -length * 0.28);
-      addBox(out, aftBridge[0], aftBridge[1], aftBridge[2], beam * 0.72, 9.5 * heightScale, length * 0.14, yaw, [0.76, 0.79, 0.80]);
-      const cargo1 = pt(0, freeboard + 3.2 * heightScale, length * 0.04);
-      addBox(out, cargo1[0], cargo1[1], cargo1[2], beam * 0.78, 5.2 * heightScale, length * 0.36, yaw, [0.58, 0.28, 0.22]);
-    } else {
-      const bridge = pt(0, freeboard + 4.4 * heightScale, length * 0.06);
-      addBox(out, bridge[0], bridge[1], bridge[2], beam * 0.62, 7.2 * heightScale, length * 0.22, yaw, [0.46, 0.52, 0.54]);
-      const mast = pt(0, freeboard + 10.2 * heightScale, length * 0.08);
-      addBox(out, mast[0], mast[1], mast[2], beam * 0.22, 6.8 * heightScale, length * 0.06, yaw, [0.35, 0.42, 0.45]);
-      const aftHangar = pt(0, freeboard + 3.2 * heightScale, -length * 0.20);
-      addBox(out, aftHangar[0], aftHangar[1], aftHangar[2], beam * 0.56, 5.0 * heightScale, length * 0.18, yaw, [0.40, 0.46, 0.48]);
-      const gun = pt(0, freeboard + 1.8 * heightScale, length * 0.28);
-      addBox(out, gun[0], gun[1], gun[2], beam * 0.26, 2.6 * heightScale, length * 0.06, yaw, [0.32, 0.38, 0.40]);
+    if (!usedGLB) {
+      const sections = [
+        { z: -length * 0.50, w: beam * 0.14, top: freeboard * 0.75, bottom: -draft * 0.65 },
+        { z: -length * 0.30, w: beam * 0.46, top: freeboard * 0.92, bottom: -draft },
+        { z: length * 0.20, w: beam * 0.50, top: freeboard, bottom: -draft },
+        { z: length * 0.44, w: beam * 0.20, top: freeboard * 0.95, bottom: -draft * 0.65 },
+        { z: length * 0.50, w: beam * 0.03, top: freeboard * 1.05, bottom: -draft * 0.30 }
+      ];
+
+      const hull = tint || [0.22, 0.29, 0.33];
+      const deck = [
+        clamp(hull[0] * 1.25, 0, 1),
+        clamp(hull[1] * 1.25, 0, 1),
+        clamp(hull[2] * 1.22, 0, 1)
+      ];
+
+      for (let i = 0; i < sections.length - 1; i++) {
+        const a = sections[i], b = sections[i + 1];
+        addQuad(out, pt(-a.w, a.top, a.z), pt(-b.w, b.top, b.z), pt(-b.w, b.bottom, b.z), pt(-a.w, a.bottom, a.z), hull);
+        addQuad(out, pt(b.w, b.top, b.z), pt(a.w, a.top, a.z), pt(a.w, a.bottom, a.z), pt(b.w, b.bottom, b.z), hull);
+        addQuad(out, pt(-a.w, a.bottom, a.z), pt(-b.w, b.bottom, b.z), pt(b.w, b.bottom, b.z), pt(a.w, a.bottom, a.z), [0.06, 0.10, 0.13]);
+        addQuad(out, pt(-a.w, a.top, a.z), pt(a.w, a.top, a.z), pt(b.w, b.top, b.z), pt(-b.w, b.top, b.z), deck);
+      }
+
+      if (kind === 'submarine') {
+        const sailCenter = pt(0, freeboard + 3.4 * heightScale, length * 0.08);
+        addBox(out, sailCenter[0], sailCenter[1], sailCenter[2], beam * 0.24, 6.2 * heightScale, length * 0.18, yaw, [0.18, 0.24, 0.27]);
+        const planesCenter = pt(0, freeboard + 2.8 * heightScale, length * 0.10);
+        addBox(out, planesCenter[0], planesCenter[1], planesCenter[2], beam * 0.72, 0.45 * heightScale, length * 0.04, yaw, [0.22, 0.28, 0.31]);
+        const finCenter = pt(0, freeboard + 2.2 * heightScale, -length * 0.44);
+        addBox(out, finCenter[0], finCenter[1], finCenter[2], beam * 0.08, 4.4 * heightScale, length * 0.07, yaw, [0.16, 0.22, 0.25]);
+      } else if (kind === 'merchant') {
+        const aftBridge = pt(0, freeboard + 5.5 * heightScale, -length * 0.28);
+        addBox(out, aftBridge[0], aftBridge[1], aftBridge[2], beam * 0.72, 9.5 * heightScale, length * 0.14, yaw, [0.76, 0.79, 0.80]);
+        const cargo1 = pt(0, freeboard + 3.2 * heightScale, length * 0.04);
+        addBox(out, cargo1[0], cargo1[1], cargo1[2], beam * 0.78, 5.2 * heightScale, length * 0.36, yaw, [0.58, 0.28, 0.22]);
+      } else {
+        const bridge = pt(0, freeboard + 4.4 * heightScale, length * 0.06);
+        addBox(out, bridge[0], bridge[1], bridge[2], beam * 0.62, 7.2 * heightScale, length * 0.22, yaw, [0.46, 0.52, 0.54]);
+        const mast = pt(0, freeboard + 10.2 * heightScale, length * 0.08);
+        addBox(out, mast[0], mast[1], mast[2], beam * 0.22, 6.8 * heightScale, length * 0.06, yaw, [0.35, 0.42, 0.45]);
+        const aftHangar = pt(0, freeboard + 3.2 * heightScale, -length * 0.20);
+        addBox(out, aftHangar[0], aftHangar[1], aftHangar[2], beam * 0.56, 5.0 * heightScale, length * 0.18, yaw, [0.40, 0.46, 0.48]);
+        const gun = pt(0, freeboard + 1.8 * heightScale, length * 0.28);
+        addBox(out, gun[0], gun[1], gun[2], beam * 0.26, 2.6 * heightScale, length * 0.06, yaw, [0.32, 0.38, 0.40]);
+      }
     }
 
     if (y >= -4 && speedKts > 1.5) {
@@ -576,6 +628,7 @@
         this.gl.clearColor(0, 0, 0, 0);
         this.ready = true;
         this.bindCameraControls();
+        if (window.GLBModelLibrary) window.GLBModelLibrary.preloadAll();
         const consoleEl = this.canvas.closest('.scope-console');
         if (consoleEl) consoleEl.classList.add('scope-3d-active');
       } catch (error) {
@@ -1091,7 +1144,7 @@
 
       if (this.mode === 'outside') {
         const subY = -Math.max(0, sub.depthM) + 4.5;
-        addVessel(out, 0, subY, 0, sub.heading, 115, 10.4, 1.0, 'submarine', [0.13, 0.19, 0.22], sub.speedKts);
+        addVessel(out, 0, subY, 0, sub.heading, 115, 10.4, 1.0, 'submarine', [0.13, 0.19, 0.22], sub.speedKts, 'ohio-submarine');
 
         if (sub.periscopeRaised && sub.depthM <= 20.5) {
           const mastTop = 5.5;
@@ -1148,10 +1201,13 @@
         }
 
         const kind = isBio ? 'biologic' : isSub ? 'submarine' : isMerchant ? 'merchant' : 'surface';
+        const subModelKey = isSub
+          ? (contact.profile && contact.profile.allegiance === 'FRIENDLY' ? 'ohio-submarine' : 'typhoon-submarine')
+          : null;
         addVessel(
           out, cx, y, cz, contact.heading,
           baseLen * visualScale, baseBeam * visualScale, visualScale,
-          kind, hullColor, contact.speedKts
+          kind, hullColor, contact.speedKts, subModelKey
         );
       }
 
@@ -1184,13 +1240,16 @@
         const hScale = clamp(1.0 + Math.sqrt(rangeM / 1000) * 0.7, 1.2, 4.2);
         const hy = heli.altitudeM || 35;
         const hYaw = radians(heli.heading || 0);
-        // Fuselage + Tail boom
-        addBox(out, hx, hy, hz, 3.2 * hScale, 3.2 * hScale, 11 * hScale, hYaw, [0.22, 0.26, 0.28]);
-        const tail = localToWorld(hx, hy + 0.6 * hScale, hz, 0, 0, -8.5 * hScale, hYaw);
-        addBox(out, tail[0], tail[1], tail[2], 1.2 * hScale, 1.4 * hScale, 7.5 * hScale, hYaw, [0.20, 0.24, 0.26]);
-        // Spinning coaxial rotor blades
-        addBox(out, hx, hy + 2.4 * hScale, hz, 16 * hScale, 0.35 * hScale, 0.9 * hScale, hYaw + (heli.rotorPhase || 0), [0.12, 0.14, 0.16]);
-        addBox(out, hx, hy + 3.1 * hScale, hz, 0.9 * hScale, 0.35 * hScale, 16 * hScale, hYaw - (heli.rotorPhase || 0), [0.12, 0.14, 0.16]);
+        const usedHeliGLB = appendGLBModel(out, 'helicopter', hx, hy, hz, heli.heading || 0, 8.0 * hScale, 5.5 * hScale, 19.0 * hScale);
+        if (!usedHeliGLB) {
+          // Fuselage + Tail boom
+          addBox(out, hx, hy, hz, 3.2 * hScale, 3.2 * hScale, 11 * hScale, hYaw, [0.22, 0.26, 0.28]);
+          const tail = localToWorld(hx, hy + 0.6 * hScale, hz, 0, 0, -8.5 * hScale, hYaw);
+          addBox(out, tail[0], tail[1], tail[2], 1.2 * hScale, 1.4 * hScale, 7.5 * hScale, hYaw, [0.20, 0.24, 0.26]);
+          // Spinning coaxial rotor blades
+          addBox(out, hx, hy + 2.4 * hScale, hz, 16 * hScale, 0.35 * hScale, 0.9 * hScale, hYaw + (heli.rotorPhase || 0), [0.12, 0.14, 0.16]);
+          addBox(out, hx, hy + 3.1 * hScale, hz, 0.9 * hScale, 0.35 * hScale, 16 * hScale, hYaw - (heli.rotorPhase || 0), [0.12, 0.14, 0.16]);
+        }
         // Dipping sonar cable into the sea when hovering
         if (heli.state === 'HOVER_DIP') {
           addBox(out, hx, hy * 0.5, hz, 0.4 * hScale, hy, 0.4 * hScale, 0, [0.72, 0.78, 0.80]);
@@ -1200,7 +1259,9 @@
       for (const buoy of world.sonobuoys || []) {
         const [bx, bz] = this.geographicOffset(sub, buoy.lat, buoy.lon);
         if (Math.hypot(bx, bz) > 22000) continue;
-        addBox(out, bx, 1.2, bz, 1.8, 2.8, 1.8, 0, [0.95, 0.45, 0.15]);
+        if (!appendGLBModel(out, 'buoy', bx, 1.0, bz, 0, 2.4, 3.8, 2.4)) {
+          addBox(out, bx, 1.2, bz, 1.8, 2.8, 1.8, 0, [0.95, 0.45, 0.15]);
+        }
       }
 
       return new Float32Array(out);
