@@ -11,6 +11,9 @@ class BathymetryService {
   constructor() {
     this.cache = new Map();
     this.pendingRequests = new Set();
+    this.localProxyUnavailable =
+      typeof window !== 'undefined' &&
+      (window.location.protocol === 'file:' || window.location.hostname.endsWith('github.io'));
     this.onlineStatus = 'LIVE MEDITERRANEAN CHARTS + ETOPO1';
 
     // Major Mediterranean Landmasses, Islands, Shallow Banks & Deep Trenches
@@ -118,20 +121,24 @@ class BathymetryService {
     }
     this.pendingRequests.add(key);
 
-    try {
-      // 1. Try local EMODnet / ETOPO1 gridded bathymetry proxy (serve_https.py)
-      const localRes = await fetch(`/api/bathymetry?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`);
-      if (localRes.ok) {
-        const bathy = await localRes.json();
-        if (bathy && Number.isFinite(bathy.depthM)) {
-          this.cache.set(key, bathy.depthM);
-          this.probedKeys.add(key);
-          this.onlineStatus = `LIVE ${String(bathy.source || 'EMODNET').toUpperCase()}`;
-          return bathy.depthM;
+    if (!this.localProxyUnavailable) {
+      try {
+        // 1. Try local EMODnet / ETOPO1 gridded bathymetry proxy (serve_https.py)
+        const localRes = await fetch(`/api/bathymetry?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`);
+        if (localRes.ok) {
+          const bathy = await localRes.json();
+          if (bathy && Number.isFinite(bathy.depthM)) {
+            this.cache.set(key, bathy.depthM);
+            this.probedKeys.add(key);
+            this.onlineStatus = `LIVE ${String(bathy.source || 'EMODNET').toUpperCase()}`;
+            return bathy.depthM;
+          }
+        } else if (localRes.status === 404 || localRes.status === 405 || localRes.status === 501) {
+          this.localProxyUnavailable = true;
         }
+      } catch (_) {
+        // Fall through to Open-Meteo elevation check
       }
-    } catch (_) {
-      // Fall through to Open-Meteo elevation check
     }
 
     try {
