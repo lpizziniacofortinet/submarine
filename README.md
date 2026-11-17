@@ -64,7 +64,17 @@ These limitations are explicit so that the interface's realistic presentation is
 
 No package installation, build tool, or server-side application is required.
 
-### Recommended: local HTTP server
+### Recommended: local HTTPS server
+
+From the project directory (requires Python 3 and `openssl` to generate a local self-signed certificate in `/tmp/submarine-ssl`):
+
+```bash
+python3 serve_https.py
+```
+
+Then open [https://localhost:8443](https://localhost:8443) and accept the self-signed certificate prompt.
+
+### Alternative: local HTTP server
 
 From the project directory:
 
@@ -99,6 +109,7 @@ No third-party Node packages are required for this test suite.
 ```text
 submarine/
 ├── index.html                  # Main interface and station layouts
+├── serve_https.py              # Local HTTPS development server (port 8443)
 ├── README.md                   # Project overview and setup
 ├── HOWTO.md                    # Operator guide
 ├── css/
