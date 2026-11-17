@@ -1624,6 +1624,14 @@ class SubmarineWorld {
     document.getElementById('btn-rx-restart').addEventListener('click', () => this.reactor.attemptRestart());
     document.getElementById('btn-rx-scram').addEventListener('click', () => this.reactor.triggerScram('MANUAL OPERATOR BUTTON'));
 
+    // Periscope 3D / external camera view selector
+    document.getElementById('btn-scope-view-periscope').addEventListener('click', () => {
+      if (window.Periscope3D) window.Periscope3D.setMode('periscope');
+    });
+    document.getElementById('btn-scope-view-outside').addEventListener('click', () => {
+      if (window.Periscope3D) window.Periscope3D.setMode('outside');
+    });
+
     // Periscope, Radar & ESM Controls
     document.getElementById('btn-scope-raise').addEventListener('click', (e) => {
       if (this.ownSub.depthM > 20.5) {
