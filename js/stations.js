@@ -1004,6 +1004,11 @@ class StationRenderers {
    * Renders Station 6 Photonics Periscope & Radar/ESM PPI Scope
    */
   renderPeriscopeStation(world) {
+    // The 3D renderer consumes the same live world state; the legacy 2D
+    // optical renderer remains available automatically if WebGL is unavailable.
+    if (window.Periscope3D && window.Periscope3D.ready) {
+      window.Periscope3D.render(world, this);
+    }
     const scopeCanvas = document.getElementById('periscope-canvas');
     if (scopeCanvas) {
       const pixelRatio = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
