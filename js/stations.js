@@ -30,9 +30,12 @@ class StationRenderers {
     this.coastlineModel = window.CoastlineModel ? new window.CoastlineModel() : null;
     this.scopeWeatherIndex = 0;
     this.scopeWeatherModes = [
-      { name: 'CLEAR', visibilityKm: 55, hazeAlpha: 0.015 },
-      { name: 'HAZE', visibilityKm: 24, hazeAlpha: 0.105 },
-      { name: 'FOG', visibilityKm: 7, hazeAlpha: 0.27 }
+      { name: 'LIVE', visibilityKm: 45, hazeAlpha: 0.02, cloudCover: 0.2, windSpeedKts: 8, windDirDeg: 130, rainMm: 0, weatherCode: 0 },
+      { name: 'CLEAR', visibilityKm: 55, hazeAlpha: 0.015, cloudCover: 0.14, windSpeedKts: 6, windDirDeg: 120, rainMm: 0, weatherCode: 0 },
+      { name: 'HAZE', visibilityKm: 24, hazeAlpha: 0.105, cloudCover: 0.45, windSpeedKts: 10, windDirDeg: 160, rainMm: 0, weatherCode: 2 },
+      { name: 'OVERCAST', visibilityKm: 18, hazeAlpha: 0.14, cloudCover: 0.88, windSpeedKts: 15, windDirDeg: 210, rainMm: 0.2, weatherCode: 3 },
+      { name: 'STORM', visibilityKm: 9, hazeAlpha: 0.22, cloudCover: 0.98, windSpeedKts: 28, windDirDeg: 250, rainMm: 8.5, weatherCode: 95 },
+      { name: 'FOG', visibilityKm: 5, hazeAlpha: 0.32, cloudCover: 0.80, windSpeedKts: 4, windDirDeg: 90, rainMm: 0, weatherCode: 45 }
     ];
     this.scopeVisibilityKm = this.scopeWeatherModes[0].visibilityKm;
     this.scopeHazeAlpha = this.scopeWeatherModes[0].hazeAlpha;
@@ -1000,10 +1003,54 @@ class StationRenderers {
     return mode.name;
   }
 
+  getEffectiveWeather(world) {
+    const mode = this.scopeWeatherModes[this.scopeWeatherIndex];
+    if (mode.name === 'LIVE' && window.LiveWeather && world && world.ownSub) {
+      window.LiveWeather.updatePosition(world.ownSub.lat, world.ownSub.lon);
+      const lw = window.LiveWeather.current;
+      this.scopeVisibilityKm = lw.visibilityKm;
+      this.scopeHazeAlpha = lw.visibilityKm < 8 ? 0.28 : lw.visibilityKm < 20 ? 0.14 : 0.025;
+      return {
+        isLive: true,
+        status: window.LiveWeather.status,
+        label: lw.label,
+        tempC: lw.tempC,
+        cloudCover: lw.cloudCover,
+        windSpeedKts: lw.windSpeedKts,
+        windDirDeg: lw.windDirDeg,
+        visibilityKm: lw.visibilityKm,
+        rainMm: lw.rainMm,
+        weatherCode: lw.weatherCode,
+        isDay: lw.isDay,
+        seaState: lw.seaState
+      };
+    }
+
+    this.scopeVisibilityKm = mode.visibilityKm;
+    this.scopeHazeAlpha = mode.hazeAlpha;
+    return {
+      isLive: false,
+      status: 'PRESET',
+      label: mode.name,
+      tempC: 20.0,
+      cloudCover: mode.cloudCover,
+      windSpeedKts: mode.windSpeedKts,
+      windDirDeg: mode.windDirDeg,
+      visibilityKm: mode.visibilityKm,
+      rainMm: mode.rainMm,
+      weatherCode: mode.weatherCode,
+      isDay: 1,
+      seaState: mode.windSpeedKts > 20 ? 5 : mode.windSpeedKts > 12 ? 3 : 2
+    };
+  }
+
   /**
    * Renders Station 6 Photonics Periscope & Radar/ESM PPI Scope
    */
   renderPeriscopeStation(world) {
+    const weather = this.getEffectiveWeather(world);
+    this.currentWeather = weather;
+
     // The 3D renderer consumes the same live world state; the legacy 2D
     // optical renderer remains available automatically if WebGL is unavailable.
     if (window.Periscope3D && window.Periscope3D.ready) {
@@ -1224,7 +1271,23 @@ class StationRenderers {
         ctx.strokeStyle = '#ffe1a2';
         ctx.strokeRect(lookX - 6, 56.5, 12, 10);
 
-        // 4. Bottom Line-of-Sight (LOS) Stadimeter Rangefinder & Surroundings Bar
+        // Animated rain streaks across the periscope lens when raining
+        if (weather.rainMm > 0.1) {
+          const dropCount = Math.min(110, Math.round(25 + weather.rainMm * 12));
+          ctx.strokeStyle = thermal ? 'rgba(215, 225, 220, 0.25)' : 'rgba(195, 218, 228, 0.34)';
+          ctx.lineWidth = 1;
+          const tRain = performance.now() * 0.001;
+          ctx.beginPath();
+          for (let i = 0; i < dropCount; i++) {
+            const rx = ((i * 97.3 + tRain * 120) % w);
+            const ry = ((i * 53.7 + tRain * 520) % (h - 60)) + 30;
+            ctx.moveTo(rx, ry);
+            ctx.lineTo(rx - 3, ry + 16);
+          }
+          ctx.stroke();
+        }
+
+        // 4. Bottom Line-of-Sight (LOS) Stadimeter Rangefinder & Live Weather Bar
         drawPanel(0, h - 30, w, 30, 'rgba(5, 15, 24, 0.92)');
         const los = window.Periscope3D.lastCenterRayInfo;
         let losText = `LOS BRG ${String(Math.round(centerBrg)).padStart(3, '0')}°  |  OPEN SEA HORIZON 4.7 NM  |  SEAFLOOR ${world.currentSeafloorM || '--'}m`;
@@ -1241,8 +1304,9 @@ class StationRenderers {
           losColor = '#e4c58f';
         }
 
-        drawText(losText, 14, h - 15, 9.5, losColor, 700);
-        drawText(`KEEL ${sub.depthM.toFixed(1)}m  |  HDG ${String(Math.round(sub.heading)).padStart(3, '0')}°`, w - 14, h - 15, 9, '#c5d4dc', 600, 'right');
+        const wxTag = `${weather.isLive ? 'LIVE WX' : 'WX'}: ${weather.label} | ${Math.round(weather.tempC)}°C | WND ${Math.round(weather.windSpeedKts)}KT ${Math.round(weather.windDirDeg)}° | VIS ${Math.round(weather.visibilityKm)}KM`;
+        drawText(losText, 14, h - 15, 9.2, losColor, 700);
+        drawText(wxTag, w - 14, h - 15, 8.8, '#a8d5df', 600, 'right');
         drawCornerFrame('rgba(201, 220, 231, 0.50)');
       } else if (!raised) {
         if (is3DActive) {

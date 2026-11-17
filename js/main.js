@@ -1652,7 +1652,9 @@ class SubmarineWorld {
       e.target.textContent = `ZOOM ${window.Stations.scopeZoom.toFixed(1)}×`;
     });
     document.getElementById('btn-scope-weather').addEventListener('click', (e) => {
-      e.target.textContent = 'METEO: ' + window.Stations.cycleScopeWeather();
+      const modeName = window.Stations.cycleScopeWeather();
+      e.target.textContent = 'METEO: ' + modeName;
+      e.target.classList.toggle('active', modeName === 'LIVE');
     });
     document.getElementById('btn-scope-left').addEventListener('click', () => {
       window.Stations.scopeBearing = (window.Stations.scopeBearing - 10 + 360) % 360;
