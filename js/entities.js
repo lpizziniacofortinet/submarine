@@ -62,6 +62,7 @@ class ContactEntity {
     this.estSpeedKts = config.estSpeedKts || 10;
     this.tmaObservable = Boolean(config.tmaObservable);
     this.tmaRmsDeg = config.tmaRmsDeg || 0;
+    this.helicopterLaunched = Boolean(config.helicopterLaunched);
     this.tmaSolver = window.BearingOnlyTMASolver
       ? new window.BearingOnlyTMASolver(config.tmaState || null)
       : null;
@@ -234,14 +235,36 @@ class ContactEntity {
     const brgToPlayer = window.Bathymetry.bearingDeg(this.lat, this.lon, ownSub.lat, ownSub.lon);
     let detectedPlayer = passiveCheck.snrDb > 2.5;
 
-    if (ownSub.radarTxActive && trueRangeNm < 18.0) {
+    // Counter-detection: Surface warships & submarines can spot exposed Radar, Periscope, ESM, or Diesel Snorkel
+    const isSurfaceUnit = this.profile.category === 'SURFACE_WARSHIP';
+    const periscopeExposed = ownSub.periscopeRaised && ownSub.depthM <= 20.5 && trueRangeNm < (isSurfaceUnit ? 4.8 : 2.2);
+    const esmExposed = ownSub.esmMastRaised && ownSub.depthM <= 20.5 && trueRangeNm < (isSurfaceUnit ? 3.8 : 1.8);
+    const dieselSnorkeling = window.ReactorPlant && window.ReactorPlant.dieselRunning && ownSub.depthM <= 20.5 && trueRangeNm < 7.2;
+
+    if ((ownSub.radarTxActive && trueRangeNm < 18.0) || periscopeExposed || esmExposed || dieselSnorkeling) {
       detectedPlayer = true;
+    }
+
+    // Also check if any friendly ASW Sonobuoy detected the submarine nearby
+    if (!detectedPlayer && Array.isArray(world.sonobuoys)) {
+      const hotBuoy = world.sonobuoys.find(
+        (b) => b.detectedSub && window.Bathymetry.distanceNm(this.lat, this.lon, b.lat, b.lon) < 12.0
+      );
+      if (hotBuoy) {
+        detectedPlayer = true;
+      }
     }
 
     if (detectedPlayer) {
       this.contactLostTimer = 0;
       this.alertedBearing = brgToPlayer + (Math.random() - 0.5) * 4.0;
-      this.aiState = passiveCheck.snrDb > 9.0 || trueRangeNm < 5.5 ? 'ATTACK' : 'INVESTIGATE';
+      this.aiState = passiveCheck.snrDb > 9.0 || trueRangeNm < 5.5 || periscopeExposed ? 'ATTACK' : 'INVESTIGATE';
+
+      // Launch Ka-27 Helix ASW Helicopter from surface warships if not yet airborne
+      if (isSurfaceUnit && !this.helicopterLaunched && typeof world.launchAswHelicopter === 'function') {
+        this.helicopterLaunched = true;
+        world.launchAswHelicopter(this, ownSub.lat, ownSub.lon);
+      }
     } else {
       this.contactLostTimer += dt;
       if (this.contactLostTimer >= 90 && this.hostileShotsThisEngagement > 0) {
@@ -415,6 +438,8 @@ class WeaponEntity {
     this.searchPattern = config.searchPattern || 'SNAKE';
     this.seekerActive = Boolean(config.seekerActive);
     this.wireConnected = config.wireConnected !== undefined ? config.wireConnected : (this.isPlayer && this.type === 'TORPEDO');
+    this.launchHeading = config.launchHeading ?? config.heading ?? 0;
+    this.maxWireYds = config.maxWireYds ?? 30000;
     this.lockedTarget = null;
     this.exploded = Boolean(config.exploded);
     this.snakePhase = config.snakePhase ?? 0;
@@ -440,6 +465,7 @@ class WeaponEntity {
       searchPattern: this.searchPattern,
       seekerActive: this.seekerActive,
       wireConnected: this.wireConnected,
+      launchHeading: this.launchHeading,
       exploded: this.exploded,
       snakePhase: this.snakePhase
     };
@@ -449,10 +475,21 @@ class WeaponEntity {
     if (this.exploded) return;
 
     if (this.wireConnected) {
+      const turnDelta = Math.abs(((ownSub.heading - this.launchHeading + 540) % 360) - 180);
       if (Math.abs(ownSub.speedKts) > 22.5) {
         this.wireConnected = false;
         if (window.GameLogger) {
           window.GameLogger.log('WEPS', `Tube ${this.tubeIndex} MK-48 fiber-optic wire parted due to own-ship speed > 22 kts!`, 'weps');
+        }
+      } else if (turnDelta > 110) {
+        this.wireConnected = false;
+        if (window.GameLogger) {
+          window.GameLogger.log('WEPS', `Tube ${this.tubeIndex} MK-48 fiber-optic wire parted due to sharp turn (>110° from launch bearing)!`, 'weps');
+        }
+      } else if (this.runDistanceYds >= this.maxWireYds) {
+        this.wireConnected = false;
+        if (window.GameLogger) {
+          window.GameLogger.log('WEPS', `Tube ${this.tubeIndex} MK-48 fiber-optic wire spool exhausted (${this.maxWireYds} yds).`, 'weps');
         }
       }
     }

@@ -1176,6 +1176,33 @@
         }
       }
 
+      // 5. ASW Helicopters (Ka-27 Helix) & Sonobuoys
+      for (const heli of world.helicopters || []) {
+        const [hx, hz] = this.geographicOffset(sub, heli.lat, heli.lon);
+        const rangeM = Math.hypot(hx, hz);
+        if (rangeM > 28000) continue;
+        const hScale = clamp(1.0 + Math.sqrt(rangeM / 1000) * 0.7, 1.2, 4.2);
+        const hy = heli.altitudeM || 35;
+        const hYaw = radians(heli.heading || 0);
+        // Fuselage + Tail boom
+        addBox(out, hx, hy, hz, 3.2 * hScale, 3.2 * hScale, 11 * hScale, hYaw, [0.22, 0.26, 0.28]);
+        const tail = localToWorld(hx, hy + 0.6 * hScale, hz, 0, 0, -8.5 * hScale, hYaw);
+        addBox(out, tail[0], tail[1], tail[2], 1.2 * hScale, 1.4 * hScale, 7.5 * hScale, hYaw, [0.20, 0.24, 0.26]);
+        // Spinning coaxial rotor blades
+        addBox(out, hx, hy + 2.4 * hScale, hz, 16 * hScale, 0.35 * hScale, 0.9 * hScale, hYaw + (heli.rotorPhase || 0), [0.12, 0.14, 0.16]);
+        addBox(out, hx, hy + 3.1 * hScale, hz, 0.9 * hScale, 0.35 * hScale, 16 * hScale, hYaw - (heli.rotorPhase || 0), [0.12, 0.14, 0.16]);
+        // Dipping sonar cable into the sea when hovering
+        if (heli.state === 'HOVER_DIP') {
+          addBox(out, hx, hy * 0.5, hz, 0.4 * hScale, hy, 0.4 * hScale, 0, [0.72, 0.78, 0.80]);
+        }
+      }
+
+      for (const buoy of world.sonobuoys || []) {
+        const [bx, bz] = this.geographicOffset(sub, buoy.lat, buoy.lon);
+        if (Math.hypot(bx, bz) > 22000) continue;
+        addBox(out, bx, 1.2, bz, 1.8, 2.8, 1.8, 0, [0.95, 0.45, 0.15]);
+      }
+
       return new Float32Array(out);
     }
 

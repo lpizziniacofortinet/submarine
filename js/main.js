@@ -81,6 +81,8 @@ class SubmarineWorld {
     this.contacts = [];
     this.weapons = [];
     this.decoys = [];
+    this.helicopters = [];
+    this.sonobuoys = [];
     this.selectedContactId = null;
     this.weaponSerial = 1;
     this.torpedoAlarmAcknowledged = false;
@@ -295,6 +297,8 @@ class SubmarineWorld {
     this.gameOver = false;
     this.weapons = [];
     this.decoys = [];
+    this.helicopters = [];
+    this.sonobuoys = [];
     this.selectedContactId = null;
     this.torpedoAlarmAcknowledged = false;
     this.torpedoMagazine = 16;
@@ -437,6 +441,20 @@ class SubmarineWorld {
       this.decoys[i].ttl -= dt;
       if (this.decoys[i].ttl <= 0) {
         this.decoys.splice(i, 1);
+      }
+    }
+
+    // 7b. Step ASW Helicopters & Sonobuoys
+    for (let i = this.helicopters.length - 1; i >= 0; i--) {
+      this.helicopters[i].update(dt, this.ownSub, this.currentThermoclineM, this);
+      if (this.helicopters[i].rtbDone) {
+        this.helicopters.splice(i, 1);
+      }
+    }
+    for (let i = this.sonobuoys.length - 1; i >= 0; i--) {
+      this.sonobuoys[i].update(dt, this.ownSub, this.currentThermoclineM, this);
+      if (this.sonobuoys[i].ttlSec <= 0) {
+        this.sonobuoys.splice(i, 1);
       }
     }
 
@@ -597,6 +615,7 @@ class SubmarineWorld {
       depthM: this.ownSub.depthM,
       orderedDepthM: runDepth,
       heading: this.ownSub.heading,
+      launchHeading: this.ownSub.heading,
       orderedHeading: launchHdg,
       speedKts,
       enableDistanceYds: enableYds,
@@ -719,6 +738,60 @@ class SubmarineWorld {
     window.GameLogger.log(
       'SONAR',
       `CONN, SONAR! TORPEDO IN THE WATER! Single hostile weapon launched by ${shooter.designation}, bearing ${Math.round((launchBearing + 180) % 360).toString().padStart(3, '0')}°!`,
+      'alert'
+    );
+    return true;
+  }
+
+  launchAswHelicopter(warship, datumLat, datumLon) {
+    if (!window.AswHelicopterEntity || this.helicopters.length >= 2) return;
+    const heliIdx = this.helicopters.length + 1;
+    const heli = new window.AswHelicopterEntity({
+      id: `HELIX-${heliIdx}`,
+      callsign: `KA-27 HELIX-${heliIdx}`,
+      ownerId: warship.id,
+      lat: warship.lat,
+      lon: warship.lon,
+      targetLat: datumLat,
+      targetLon: datumLon
+    });
+    this.helicopters.push(heli);
+    window.GameLogger.log(
+      'SONAR',
+      `ESM / ACOUSTIC ALERT: ${warship.designation} launched ${heli.callsign} ASW Helicopter toward our datum!`,
+      'alert'
+    );
+  }
+
+  fireAirDroppedTorpedo(heli, bearingToPlayer, estPlayerDepth) {
+    const activeHostileTorpedoes = this.weapons.filter(
+      (weapon) => !weapon.isPlayer && weapon.type === 'TORPEDO' && !weapon.exploded
+    ).length;
+    if (activeHostileTorpedoes >= 2) return false;
+
+    const launchBearing = (bearingToPlayer + (Math.random() - 0.5) * 4.0 + 360) % 360;
+    const torp = new window.WeaponEntity({
+      id: `APR3E-${this.weaponSerial++}`,
+      name: 'APR-3E ASW TORPEDO',
+      type: 'TORPEDO',
+      isPlayer: false,
+      lat: heli.lat,
+      lon: heli.lon,
+      depthM: 18,
+      orderedDepthM: Math.max(15, estPlayerDepth),
+      heading: launchBearing,
+      orderedHeading: launchBearing,
+      speedKts: 50,
+      enableDistanceYds: 450,
+      seekerMode: 'ACTIVE_PASSIVE',
+      searchPattern: 'CIRCLE'
+    });
+    this.weapons.push(torp);
+    this.torpedoAlarmAcknowledged = false;
+    if (window.SubAudio) window.SubAudio.playAlarm('TORPEDO');
+    window.GameLogger.log(
+      'SONAR',
+      `CONN, SONAR! TORPEDO SPLASH! ${heli.callsign} dropped an APR-3E ASW Torpedo nearby!`,
       'alert'
     );
     return true;

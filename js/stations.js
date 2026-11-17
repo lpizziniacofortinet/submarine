@@ -391,6 +391,30 @@ class StationRenderers {
       ctx.fillText('DECOY', dPt.x + 8, dPt.y + 3);
     }
 
+    // 6b. Draw Hostile ASW Sonobuoys & Helicopters
+    for (const b of world.sonobuoys || []) {
+      const bPt = this.leafletMap.latLngToContainerPoint([b.lat, b.lon]);
+      ctx.strokeStyle = '#ff6b6b';
+      ctx.beginPath();
+      ctx.arc(bPt.x, bPt.y, 4, 0, Math.PI * 2);
+      ctx.stroke();
+      ctx.fillStyle = '#ff6b6b';
+      ctx.fillText(b.id, bPt.x + 6, bPt.y + 3);
+    }
+    for (const h of world.helicopters || []) {
+      const hPt = this.leafletMap.latLngToContainerPoint([h.lat, h.lon]);
+      ctx.strokeStyle = '#ff2a2a';
+      ctx.lineWidth = 1.8;
+      ctx.beginPath();
+      ctx.moveTo(hPt.x - 8, hPt.y);
+      ctx.lineTo(hPt.x, hPt.y - 8);
+      ctx.lineTo(hPt.x + 8, hPt.y);
+      ctx.stroke();
+      ctx.fillStyle = '#ff2a2a';
+      ctx.font = 'bold 10px Courier New';
+      ctx.fillText(`${h.callsign} (${h.state})`, hPt.x + 10, hPt.y - 2);
+    }
+
     // 7. Draw Own Submarine (USS Virginia NTDS Cyan U-shape + Heading Vector)
     ctx.strokeStyle = '#00e5ff';
     ctx.lineWidth = 2;
