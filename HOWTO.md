@@ -194,17 +194,16 @@ Depth changes, plane effectiveness, and ballast response are simplified. Monitor
 3. Set the launch gyro heading, run depth, seeker-enable distance, and other available options.
 4. Use the tube's **FLOOD & OPEN** control.
 5. When the tube is ready, use **FIRE TUBE**.
-6. If wire guidance is available and online, use the in-game guidance controls to adjust the weapon.
-
-The torpedo seeker and guidance behavior are simulated. The displayed TMA estimate is not an independent real-world fire-control solution.
+6. If wire guidance is available and online, use the in-game guidance controls to adjust the weapon. Guidance wires snap if your submarine exceeds `22.5 knots`, turns more than `110°` from launch heading, or reaches the `30,000 yd` spool limit. Torpedoes that strike coastlines or the seabed are destroyed with an immediate alert.
 
 ### VLS
 Select an available VLS payload and use its launch control when the in-game launch conditions are met. The game models missile launch and target engagement at a simplified level.
 
-### Countermeasures
+### Countermeasures & ASW Threats
 - Use **LAUNCH NOISEMAKER [C]** to deploy an acoustic decoy when available.
 - Use **EVASIVE KNUCKLE** to trigger the game's evasive maneuver.
 - Monitor the **TORPEDO IN WATER** annunciator and tactical display.
+- **ASW Helicopters & Sonobuoys:** Non-NATO warships launch **Ka-27 Helix** helicopters that drop **DIFAR/DICASS sonobuoys**, dip active sonar below the thermocline, and drop **APR-3E** ASW torpedoes. Avoid leaving your periscope, ESM mast, or diesel snorkel exposed near enemy surface ships.
 
 ## 10. Periscope, radar, and ESM
 

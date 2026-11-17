@@ -112,8 +112,27 @@ class BathymetryService {
    */
   async probeOnlineBathymetry(lat, lon) {
     const key = `${lat.toFixed(2)},${lon.toFixed(2)}`;
-    if (this.pendingRequests.has(key)) return this.getSeafloorDepthMeters(lat, lon);
+    if (!this.probedKeys) this.probedKeys = new Set();
+    if (this.pendingRequests.has(key) || this.probedKeys.has(key)) {
+      return this.getSeafloorDepthMeters(lat, lon);
+    }
     this.pendingRequests.add(key);
+
+    try {
+      // 1. Try local EMODnet / ETOPO1 gridded bathymetry proxy (serve_https.py)
+      const localRes = await fetch(`/api/bathymetry?lat=${lat.toFixed(5)}&lon=${lon.toFixed(5)}`);
+      if (localRes.ok) {
+        const bathy = await localRes.json();
+        if (bathy && Number.isFinite(bathy.depthM)) {
+          this.cache.set(key, bathy.depthM);
+          this.probedKeys.add(key);
+          this.onlineStatus = `LIVE ${String(bathy.source || 'EMODNET').toUpperCase()}`;
+          return bathy.depthM;
+        }
+      }
+    } catch (_) {
+      // Fall through to Open-Meteo elevation check
+    }
 
     try {
       const url = `https://api.open-meteo.com/v1/elevation?latitude=${lat.toFixed(4)}&longitude=${lon.toFixed(4)}`;
@@ -122,6 +141,7 @@ class BathymetryService {
         const data = await res.json();
         if (data && Array.isArray(data.elevation) && data.elevation.length > 0) {
           const elev = data.elevation[0];
+          this.probedKeys.add(key);
           this.onlineStatus = 'ONLINE (OPEN-METEO + OPENSEAMAP)';
           if (elev > 1) {
             this.cache.set(key, 0);

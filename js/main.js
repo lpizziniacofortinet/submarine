@@ -372,7 +372,8 @@ class SubmarineWorld {
 
     this.simTimeSec += dt;
 
-    // 1. Query Bathymetry & Thermocline at current Lat/Lon
+    // 1. Query Bathymetry & Thermocline at current Lat/Lon (auto-probes EMODnet per 0.01° cell)
+    window.Bathymetry.probeOnlineBathymetry(this.ownSub.lat, this.ownSub.lon);
     this.currentSeafloorM = window.Bathymetry.getSeafloorDepthMeters(this.ownSub.lat, this.ownSub.lon);
     this.currentThermoclineM = window.Bathymetry.getThermoclineDepth(this.ownSub.lat, this.ownSub.lon);
 

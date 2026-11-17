@@ -134,5 +134,10 @@
     }
   }
 
-  window.LiveWeather = new LiveWeatherService();
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = LiveWeatherService;
+  }
+  if (typeof window !== 'undefined') {
+    window.LiveWeather = new LiveWeatherService();
+  }
 })();
