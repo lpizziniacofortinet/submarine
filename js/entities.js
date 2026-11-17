@@ -491,6 +491,30 @@ class WeaponEntity {
     this.lat = nextPos.lat;
     this.lon = nextPos.lon;
 
+    // Destroy torpedo if it strikes land, reef, or runs into the seafloor
+    if (this.type === 'TORPEDO') {
+      const hitLandMask = window.CoastlineModel && window.CoastlineModel.isLand
+        ? window.CoastlineModel.isLand(this.lat, this.lon)
+        : false;
+      const seafloorM = window.Bathymetry.getSeafloorDepthMeters(this.lat, this.lon);
+      const hitSeafloor = seafloorM <= 4 || this.depthM >= seafloorM;
+
+      if (hitLandMask || hitSeafloor) {
+        this.exploded = true;
+        this.wireConnected = false;
+        const distFromPlayer = window.Bathymetry.distanceNm(ownSub.lat, ownSub.lon, this.lat, this.lon);
+        if (window.SubAudio) window.SubAudio.playExplosion(distFromPlayer);
+        if (window.GameLogger) {
+          const reason = hitLandMask || seafloorM <= 4 ? 'LAND / COASTLINE' : `SEABED (${seafloorM}m)`;
+          const msg = this.isPlayer
+            ? `TORPEDO DESTROYED: ${this.name} (${this.id}) impacted ${reason} at ${Math.round(this.runDistanceYds)} yds!`
+            : `INCOMING THREAT DESTROYED: Hostile torpedo (${this.id}) impacted ${reason}!`;
+          window.GameLogger.log('WEPS', msg, 'alert');
+        }
+        return;
+      }
+    }
+
     this.checkImpact(ownSub, contacts, world);
 
     if (this.runDistanceYds >= this.maxRunYds && !this.exploded) {
