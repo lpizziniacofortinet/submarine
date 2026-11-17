@@ -584,6 +584,8 @@
               </div>
               <div class="scope-toolbar">
                 <button class="mil-btn scope-control" id="btn-scope-raise">RAISE MAST</button>
+                <button class="mil-btn scope-control active" id="btn-scope-view-periscope">PERISCOPE 3D</button>
+                <button class="mil-btn scope-control" id="btn-scope-view-outside">OUTSIDE 3D</button>
                 <button class="mil-btn scope-control" id="btn-scope-ir">FLIR: OFF</button>
                 <button class="mil-btn scope-control" id="btn-scope-zoom">ZOOM 1.5×</button>
                 <button class="mil-btn scope-control" id="btn-scope-weather">METEO: CLEAR</button>
@@ -591,6 +593,8 @@
             </div>
             <div class="scope-viewport">
               <canvas id="periscope-canvas" class="scope-display" aria-label="AN/BVS-1 electro-optical periscope image"></canvas>
+              <canvas id="periscope-3d-canvas" class="scope-display-3d" aria-label="Live 3D periscope and external scene"></canvas>
+              <div class="scope-3d-reticle" aria-hidden="true"><span></span></div>
               <div class="scope-live-mark"><span></span> EO SENSOR</div>
             </div>
               <div class="scope-credit">
@@ -865,6 +869,7 @@
   <script src="js/entities.js"></script>
   <script src="js/coastline.js"></script>
   <script src="js/stations.js"></script>
+  <script src="js/periscope3d.js"></script>
   <script src="js/simulation-clock.js"></script>
   <script src="js/main.js"></script>
 </body>
