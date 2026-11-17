@@ -464,30 +464,22 @@
       const lx = pos[i] * width;
       const ly = pos[i + 1] * height;
       const lz = pos[i + 2] * length;
-      out.positions.push(
-        x + lx * cosY + lz * sinY,
-        y + ly,
-        z - lx * sinY + lz * cosY
-      );
+      const px = x + lx * cosY + lz * sinY;
+      const py = y + ly;
+      const pz = z + lx * sinY - lz * cosY;
+
+      const cr = tintBlend ? col[i] * 0.65 + tintBlend[0] * 0.35 : col[i];
+      const cg = tintBlend ? col[i + 1] * 0.65 + tintBlend[1] * 0.35 : col[i + 1];
+      const cb = tintBlend ? col[i + 2] * 0.65 + tintBlend[2] * 0.35 : col[i + 2];
 
       const nkx = norm[i];
       const nky = norm[i + 1];
       const nkz = norm[i + 2];
-      out.normals.push(
-        nkx * cosY + nkz * sinY,
-        nky,
-        -nkx * sinY + nkz * cosY
-      );
+      const nx = nkx * cosY + nkz * sinY;
+      const ny = nky;
+      const nz = nkx * sinY - nkz * cosY;
 
-      if (tintBlend) {
-        out.colors.push(
-          col[i] * 0.65 + tintBlend[0] * 0.35,
-          col[i + 1] * 0.65 + tintBlend[1] * 0.35,
-          col[i + 2] * 0.65 + tintBlend[2] * 0.35
-        );
-      } else {
-        out.colors.push(col[i], col[i + 1], col[i + 2]);
-      }
+      out.push(px, py, pz, cr, cg, cb, nx, ny, nz);
     }
     return true;
   }
