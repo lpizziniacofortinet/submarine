@@ -52,9 +52,15 @@ button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-v
 .pill { font: 700 10px/1 var(--mono); letter-spacing: .11em; color: var(--red); }
 .pill.online { color: var(--green-strong); }
 .pill.connecting { color: var(--amber); }
+.state-indicator.online { background: var(--green); box-shadow: 0 0 0 3px rgba(143, 206, 170, .12), 0 0 10px rgba(143, 206, 170, .45); }
+.state-indicator.connecting { background: var(--amber); box-shadow: 0 0 0 3px rgba(229, 183, 111, .12), 0 0 10px rgba(229, 183, 111, .4); }
+.pill.online { color: var(--green-strong); }
+.pill.connecting { color: var(--amber); }
 .icon-btn, .connect-trigger { min-height: 36px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 0 12px; border: 1px solid var(--line-strong); border-radius: 5px; background: var(--panel-raised); color: var(--text-soft); font: 700 10px var(--mono); letter-spacing: .08em; cursor: pointer; }
 .icon-btn:hover, .connect-trigger:hover { border-color: var(--cyan); color: var(--text); }
 .audio-state { color: var(--amber); }
+.icon-btn.active { border-color: #477d69; color: var(--green-strong); }
+.icon-btn.active .audio-state { color: var(--green-strong); }
 .connection-drawer { position: relative; }
 .connection-drawer[open] .connect-trigger { border-color: var(--cyan); color: var(--cyan); }
 .trigger-icon { color: var(--cyan); font-size: 16px; }
