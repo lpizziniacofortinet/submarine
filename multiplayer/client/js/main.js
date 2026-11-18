@@ -85,20 +85,39 @@
     const contacts = snap.contacts || [];
     document.getElementById('contact-count').textContent = contacts.length;
     const tbody = document.getElementById('contacts-table-body');
-    tbody.innerHTML = '';
     if (contacts.length === 0) {
-      tbody.innerHTML = '<tr><td colspan="4" class="muted">No tracks detected.</td></tr>';
+      if (tbody.dataset.empty !== '1') {
+        tbody.innerHTML = '<tr><td colspan="4" class="muted">No tracks detected.</td></tr>';
+        tbody.dataset.empty = '1';
+      }
     } else {
+      const idsKey = contacts.map((c) => c.id).join(',');
+      if (tbody.dataset.idsKey !== idsKey) {
+        tbody.dataset.empty = '0';
+        tbody.dataset.idsKey = idsKey;
+        tbody.innerHTML = '';
+        for (const c of contacts) {
+          const tr = document.createElement('tr');
+          tr.dataset.contactId = c.id;
+          tr.innerHTML = '<td></td><td></td><td></td><td></td>';
+          tr.addEventListener('click', () => {
+            selectedContactId = selectedContactId === c.id ? null : c.id;
+            if (lastSnapshot) updateUI(lastSnapshot);
+            renderer.renderActiveStation(activeStation, selectedContactId);
+          });
+          tbody.appendChild(tr);
+        }
+      }
       for (const c of contacts) {
-        const tr = document.createElement('tr');
-        if (c.id === selectedContactId) tr.className = 'selected';
+        const tr = tbody.querySelector(`tr[data-contact-id="${c.id}"]`);
+        if (!tr) continue;
+        tr.classList.toggle('selected', c.id === selectedContactId);
         const rngTxt = c.ranged && c.rangeNm !== null ? `${c.rangeNm.toFixed(1)}NM` : `TMA ${c.tmaQualityPct}%`;
-        tr.innerHTML = `<td>${c.id}</td><td>${c.category}</td><td>${c.bearingDeg.toFixed(0)}°</td><td>${rngTxt}</td>`;
-        tr.addEventListener('click', () => {
-          selectedContactId = selectedContactId === c.id ? null : c.id;
-          updateUI(snap);
-        });
-        tbody.appendChild(tr);
+        const cells = tr.children;
+        cells[0].textContent = c.id;
+        cells[1].textContent = c.category;
+        cells[2].textContent = `${c.bearingDeg.toFixed(0)}°`;
+        cells[3].textContent = rngTxt;
       }
     }
 
@@ -200,6 +219,40 @@
     if (!lastSnapshot) return;
     const sel = (lastSnapshot.contacts || []).find((c) => c.id === selectedContactId);
     if (sel) document.getElementById('order-torp-brg').value = Math.round(sel.bearingDeg);
+  });
+
+  document.getElementById('btn-sonar-clear-track').addEventListener('click', () => {
+    selectedContactId = null;
+    if (lastSnapshot) updateUI(lastSnapshot);
+    renderer.renderActiveStation(activeStation, selectedContactId);
+  });
+
+  const wfCanvas = document.getElementById('sonar-waterfall-canvas');
+  wfCanvas.addEventListener('mousemove', (e) => {
+    const rect = wfCanvas.getBoundingClientRect();
+    if (!rect.width) return;
+    const brg = Math.round(((e.clientX - rect.left) / rect.width) * 360) % 360;
+    document.getElementById('sonar-cursor-brg').textContent = `BRG: ${brg.toString().padStart(3, '0')}°`;
+  });
+  wfCanvas.addEventListener('click', (e) => {
+    if (!lastSnapshot) return;
+    const rect = wfCanvas.getBoundingClientRect();
+    if (!rect.width) return;
+    const clickBrg = ((e.clientX - rect.left) / rect.width) * 360;
+    let best = null;
+    let minDiff = 15;
+    for (const c of lastSnapshot.contacts || []) {
+      const diff = Math.abs(((c.bearingDeg - clickBrg + 540) % 360) - 180);
+      if (diff < minDiff) {
+        minDiff = diff;
+        best = c;
+      }
+    }
+    if (best) {
+      selectedContactId = selectedContactId === best.id ? null : best.id;
+      updateUI(lastSnapshot);
+      renderer.renderActiveStation(activeStation, selectedContactId);
+    }
   });
 
   window.addEventListener('keydown', (e) => {
