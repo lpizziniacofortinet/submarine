@@ -21,6 +21,7 @@
       this.snapshotIntervalMs = 100;
       this.periscopeZoom = 1;
       this.periscopeFovDeg = 60;
+      this.periscopeBearingOffset = 0;
 
       // Offscreen Sonar Waterfall buffer
       this.wfBuffer = document.createElement('canvas');
@@ -412,6 +413,21 @@
       if (fov) fov.textContent = `${(this.periscopeFovDeg / this.periscopeZoom).toFixed(0)}°`;
     }
 
+    slewPeriscope(direction) {
+      this.periscopeBearingOffset = ((this.periscopeBearingOffset + direction * 5 + 540) % 360) - 180;
+      const heading = this.currSnapshot ? this.currSnapshot.ownSub.headingDeg : 90;
+      const azimuth = (heading + this.periscopeBearingOffset + 360) % 360;
+      const label = document.getElementById('periscope-azimuth');
+      if (label) label.textContent = `${Math.round(azimuth).toString().padStart(3, '0')}°`;
+    }
+
+    centerPeriscope() {
+      this.periscopeBearingOffset = 0;
+      const heading = this.currSnapshot ? this.currSnapshot.ownSub.headingDeg : 90;
+      const label = document.getElementById('periscope-azimuth');
+      if (label) label.textContent = `${Math.round(heading).toString().padStart(3, '0')}°`;
+    }
+
     renderPeriscope() {
       const canvas = document.getElementById('periscope-canvas');
       if (!canvas) return;
@@ -474,7 +490,7 @@
       const fov = this.periscopeFovDeg / this.periscopeZoom;
       ctx.fillStyle = 'rgba(4,13,18,0.46)';
       ctx.fillRect(0, 0, w, 42);
-      const heading = Number(sub.headingDeg) || 0;
+      const heading = ((Number(sub.headingDeg) || 0) + this.periscopeBearingOffset + 360) % 360;
       const first = Math.floor((heading - fov / 2) / 5) * 5;
       const last = Math.ceil((heading + fov / 2) / 5) * 5;
       ctx.font = '10px Consolas, monospace';
@@ -553,6 +569,8 @@
         : 'AWAITING AUTHORITATIVE WORLD SNAPSHOT';
       ctx.fillText(cueText, 14, h - 16);
 
+      const azimuthLabel = document.getElementById('periscope-azimuth');
+      if (azimuthLabel) azimuthLabel.textContent = `${Math.round(heading).toString().padStart(3, '0')}°`;
       const fovLabel = document.getElementById('periscope-fov');
       if (fovLabel) fovLabel.textContent = `${fov.toFixed(0)}°`;
       const zoomLabel = document.getElementById('periscope-zoom-label');
