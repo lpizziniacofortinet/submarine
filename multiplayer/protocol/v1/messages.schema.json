@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://ssn774.local/protocol/v1/messages.schema.json",
+  "title": "SSN-774 Multiplayer Protocol v1",
+  "oneOf": [
+    {
+      "type": "object",
+      "required": ["type", "version", "payload"],
+      "properties": {
+        "type": { "const": "HELLO" },
+        "version": { "const": 1 },
+        "payload": {
+          "type": "object",
+          "required": ["clientName"],
+          "properties": {
+            "clientName": { "type": "string", "minLength": 1, "maxLength": 64 },
+            "sessionId": { "type": ["string", "null"] }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["type", "version", "payload"],
+      "properties": {
+        "type": { "const": "PING" },
+        "version": { "const": 1 },
+        "payload": {
+          "type": "object",
+          "required": ["clientTimeMs"],
+          "properties": {
+            "clientTimeMs": { "type": "number" }
+          }
+        }
+      }
+    },
+    {
+      "type": "object",
+      "required": ["type", "version", "sequence", "payload"],
+      "properties": {
+        "type": { "const": "COMMAND" },
+        "version": { "const": 1 },
+        "sequence": { "type": "integer", "minimum": 1 },
+        "payload": {
+          "type": "object",
+          "required": ["command", "value"],
+          "properties": {
+            "command": { "enum": ["SET_HEADING", "SET_SPEED", "SET_DEPTH"] },
+            "value": { "type": "number" }
+          }
+        }
+      }
+    }
+  ]
+}

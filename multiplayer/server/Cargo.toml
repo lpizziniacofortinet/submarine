@@ -1,0 +1,19 @@
+[package]
+name = "ssn774-server"
+version = "0.1.0"
+edition = "2021"
+description = "Authoritative Rust simulation & WebSocket server for SSN-774 Submarine Simulator"
+
+[dependencies]
+axum = { version = "0.7", features = ["ws", "json"] }
+futures-util = "0.3"
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tokio = { version = "1.40", features = ["macros", "rt-multi-thread", "sync", "time", "net", "signal"] }
+tower-http = { version = "0.6", features = ["fs", "cors"] }
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+uuid = { version = "1.10", features = ["v4"] }
+
+[dev-dependencies]
+tokio-tungstenite = "0.24"
