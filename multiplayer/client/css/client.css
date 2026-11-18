@@ -103,7 +103,9 @@ button:disabled { opacity: .38; cursor: not-allowed; }
 .telemetry-shell { display: grid; grid-template-columns: 104px minmax(0, 1fr) auto; align-items: stretch; gap: 14px; padding: 11px 14px; border: 1px solid var(--line); border-radius: 7px; background: rgba(11, 24, 33, .78); }
 .telemetry-heading { display: flex; flex-direction: column; justify-content: center; gap: 6px; border-right: 1px solid var(--line); }
 .telemetry-live { display: flex; align-items: center; gap: 6px; color: var(--muted); font: 8px var(--mono); letter-spacing: .08em; white-space: nowrap; }
-.telemetry-live i { width: 5px; height: 5px; background: var(--green); box-shadow: 0 0 8px rgba(143, 206, 170, .5); }
+.telemetry-live i { width: 5px; height: 5px; background: var(--red); box-shadow: 0 0 8px rgba(231, 120, 115, .3); }
+.telemetry-live.online i { background: var(--green); box-shadow: 0 0 8px rgba(143, 206, 170, .5); }
+.telemetry-live.connecting i { background: var(--amber); box-shadow: 0 0 8px rgba(229, 183, 111, .45); }
 .telemetry-grid { display: grid; grid-template-columns: repeat(8, minmax(75px, 1fr)); align-items: center; gap: 8px; }
 .telemetry-cell { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
 .hud-label { color: var(--muted); font: 700 8px var(--mono); letter-spacing: .11em; white-space: nowrap; }
