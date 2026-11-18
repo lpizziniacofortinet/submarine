@@ -13,28 +13,30 @@
   class MultiStationRenderer {
     constructor() {
       this.leafletMap = null;
+      this.oceanLayer = null;
+      this.darkLayer = null;
       this.mapInitialized = false;
       this.followSub = true;
+      this.waypointMode = false;
       this.prevSnapshot = null;
       this.currSnapshot = null;
       this.snapshotArrivalMs = 0;
       this.snapshotIntervalMs = 100;
-      this.periscopeZoom = 1;
-      this.periscopeFovDeg = 60;
-      this.periscopeBearingOffset = 0;
+      this.radarSweepDeg = 0;
 
-      // Offscreen Sonar Waterfall buffer
       this.wfBuffer = document.createElement('canvas');
       this.wfBuffer.width = 720;
       this.wfBuffer.height = 300;
       this.wfCtx = this.wfBuffer.getContext('2d');
       this.wfCtx.fillStyle = '#020704';
       this.wfCtx.fillRect(0, 0, 720, 300);
+
+      this.periscope3d = root.ThreePeriscopeEngine ? new root.ThreePeriscopeEngine() : null;
     }
 
-    initLeafletMap() {
+    initLeafletMap(onMapCourseOrder) {
       if (this.mapInitialized || typeof L === 'undefined') return;
-      const el = document.getElementById('tactical-leaflet-map');
+      const el = document.getElementById('leaflet-map');
       if (!el) return;
       this.leafletMap = L.map(el, {
         center: [37.18, 15.50],
@@ -42,29 +44,72 @@
         zoomControl: false,
         attributionControl: false
       });
-      // ESRI World Ocean Basemap (Real NOAA/GEBCO Bathymetry Contours, no API key required)
-      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', {
-        maxZoom: 14
-      }).addTo(this.leafletMap);
-      // OpenSeaMap Nautical Seamarks & Harbors
-      L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
-        maxZoom: 16,
-        opacity: 0.78
-      }).addTo(this.leafletMap);
+
+      this.oceanLayer = L.tileLayer(
+        'https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}',
+        { maxZoom: 14 }
+      );
+      this.darkLayer = L.tileLayer(
+        'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+        { maxZoom: 16 }
+      );
+      this.seamarkLayer = L.tileLayer(
+        'https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png',
+        { maxZoom: 16, opacity: 0.78 }
+      );
+
+      this.oceanLayer.addTo(this.leafletMap);
+      this.seamarkLayer.addTo(this.leafletMap);
       const tilePane = this.leafletMap.getPane('tilePane');
       if (tilePane) tilePane.classList.add('bathymetry-filter');
+
+      this.leafletMap.on('mousemove', (e) => {
+        const readout = document.getElementById('map-cursor-readout');
+        if (!readout || !this.currSnapshot) return;
+        const sub = this.currSnapshot.ownSub;
+        const dLat = (e.latlng.lat - sub.lat) * 60;
+        const dLon = (e.latlng.lng - sub.lon) * 60 * Math.cos((sub.lat * Math.PI) / 180);
+        const rng = Math.hypot(dLat, dLon);
+        const brg = ((Math.atan2(dLon, dLat) * 180) / Math.PI + 360) % 360;
+        readout.textContent = `CURSOR: ${e.latlng.lat.toFixed(3)}°N ${e.latlng.lng.toFixed(3)}°E | BRG: ${Math.round(brg).toString().padStart(3, '0')}° | RNG: ${rng.toFixed(1)} NM | AUTH SERVER PICTURE`;
+      });
+
+      this.leafletMap.on('click', (e) => {
+        if (!this.waypointMode || !this.currSnapshot || !onMapCourseOrder) return;
+        const sub = this.currSnapshot.ownSub;
+        const dLat = (e.latlng.lat - sub.lat) * 60;
+        const dLon = (e.latlng.lng - sub.lon) * 60 * Math.cos((sub.lat * Math.PI) / 180);
+        const brg = Math.round(((Math.atan2(dLon, dLat) * 180) / Math.PI + 360) % 360);
+        onMapCourseOrder(brg);
+      });
+
       this.mapInitialized = true;
     }
 
+    setMapLayer(mode) {
+      if (!this.leafletMap) return;
+      const tilePane = this.leafletMap.getPane('tilePane');
+      if (mode === 'ocean') {
+        if (this.leafletMap.hasLayer(this.darkLayer)) this.leafletMap.removeLayer(this.darkLayer);
+        if (!this.leafletMap.hasLayer(this.oceanLayer)) this.oceanLayer.addTo(this.leafletMap);
+        if (tilePane) tilePane.classList.add('bathymetry-filter');
+      } else {
+        if (this.leafletMap.hasLayer(this.oceanLayer)) this.leafletMap.removeLayer(this.oceanLayer);
+        if (!this.leafletMap.hasLayer(this.darkLayer)) this.darkLayer.addTo(this.leafletMap);
+        if (tilePane) tilePane.classList.remove('bathymetry-filter');
+      }
+    }
+
     pushSnapshot(snapshot, snapshotHz = 10) {
+      const first = !this.currSnapshot;
       this.prevSnapshot = this.currSnapshot;
       this.currSnapshot = snapshot;
       this.snapshotArrivalMs = performance.now();
       this.snapshotIntervalMs = 1000 / Math.max(1, snapshotHz);
       this.stepWaterfall(snapshot);
 
-      if (this.leafletMap && this.followSub && !this.prevSnapshot) {
-        this.leafletMap.setView([snapshot.ownSub.lat, snapshot.ownSub.lon], 10);
+      if (this.leafletMap && (first || this.followSub)) {
+        this.leafletMap.panTo([snapshot.ownSub.lat, snapshot.ownSub.lon], { animate: false });
       }
     }
 
@@ -84,20 +129,26 @@
     }
 
     renderActiveStation(station, selectedContactId) {
+      const interp = this.getInterpolatedState();
       if (station === 'tactical') {
-        this.renderTacticalOverlay(selectedContactId);
+        this.renderTacticalOverlay(selectedContactId, interp);
       } else if (station === 'sonar') {
         this.renderSonarStation(selectedContactId);
       } else if (station === 'weapons') {
-        this.renderFireControlScope(selectedContactId);
+        this.renderFireControlScope(selectedContactId, interp);
       } else if (station === 'maneuvering') {
-        this.renderSvpCanvas();
+        this.renderManeuveringStation();
+      } else if (station === 'reactor') {
+        this.renderReactorSchematic();
       } else if (station === 'periscope') {
-        this.renderPeriscope();
+        if (this.periscope3d) {
+          this.periscope3d.render(this.currSnapshot, interp, selectedContactId);
+        }
+        this.renderRadarEsmCanvas(selectedContactId);
       }
     }
 
-    renderTacticalOverlay(selectedContactId) {
+    renderTacticalOverlay(selectedContactId, interp) {
       const canvas = document.getElementById('tactical-overlay-canvas');
       if (!canvas || !this.leafletMap) return;
       if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
@@ -106,16 +157,13 @@
       }
       const ctx = canvas.getContext('2d');
       ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      const interp = this.getInterpolatedState();
       if (!interp || !this.currSnapshot) return;
 
       const subPt = this.leafletMap.latLngToContainerPoint([interp.subLat, interp.subLon]);
-
-      // Range rings (5 NM, 10 NM)
       const metersPerPx =
         (40075016.686 * Math.cos((interp.subLat * Math.PI) / 180)) /
         (256 * Math.pow(2, this.leafletMap.getZoom()));
+
       for (const nm of [5, 10]) {
         const rPx = (nm * 1852) / metersPerPx;
         ctx.strokeStyle = 'rgba(0, 255, 102, 0.22)';
@@ -124,7 +172,6 @@
         ctx.stroke();
       }
 
-      // Contacts (bearing rays when passive, resolved markers when ranged)
       for (const c of this.currSnapshot.contacts || []) {
         const isSel = c.id === selectedContactId;
         const col = isSel ? '#ffb000' : c.allegiance === 'HOSTILE' ? '#ff3b3b' : '#00ff66';
@@ -160,7 +207,6 @@
         }
       }
 
-      // Decoys & Weapons
       for (const d of this.currSnapshot.decoys || []) {
         const pt = this.leafletMap.latLngToContainerPoint([d.lat, d.lon]);
         ctx.strokeStyle = '#ffb000';
@@ -178,7 +224,6 @@
         ctx.fillText(w.id, pt.x + 6, pt.y + 3);
       }
 
-      // Own Submarine
       const subRad = (interp.subHdg * Math.PI) / 180;
       ctx.fillStyle = '#00e5ff';
       ctx.strokeStyle = '#00e5ff';
@@ -256,7 +301,6 @@
           }
         }
       }
-
       this.renderDemonCanvas(selectedContactId);
       this.renderTmaMini(selectedContactId);
     }
@@ -290,10 +334,19 @@
         ctx.fillStyle = '#5a8c6b';
         ctx.font = '11px Courier New';
         ctx.fillText('SELECT A SONAR TRACK TO INSPECT NARROWBAND TONALS', 20, h / 2);
+        document.getElementById('demon-tonals').textContent = '-- Hz';
+        document.getElementById('demon-blades').textContent = '--';
+        document.getElementById('demon-plant').textContent = '--';
         return;
       }
 
-      const tonals = sel.category === 'MERCHANT' ? [32, 64, 128] : sel.category === 'WARSHIP' ? [75, 150, 260] : [52, 104, 185];
+      const isMerchant = sel.category === 'MERCHANT';
+      const isWarship = sel.category === 'WARSHIP';
+      const tonals = isMerchant ? [32, 64, 128] : isWarship ? [75, 150, 260] : [52, 104, 185];
+      document.getElementById('demon-tonals').textContent = tonals.join(' / ') + ' Hz';
+      document.getElementById('demon-blades').textContent = isMerchant ? '4-BLADE SCREW' : isWarship ? '5-BLADE SCREW' : '7-BLADE PUMPJET';
+      document.getElementById('demon-plant').textContent = isMerchant ? '2-STROKE DIESEL' : isWarship ? 'COGAG TURBINE' : 'PWR NUCLEAR';
+
       ctx.strokeStyle = '#00ff66';
       ctx.beginPath();
       for (let x = 0; x < w; x++) {
@@ -341,11 +394,11 @@
       ctx.fill();
     }
 
-    renderFireControlScope(selectedContactId) {
+    renderFireControlScope(selectedContactId, interp) {
       const canvas = document.getElementById('fc-scope-canvas');
       if (!canvas) return;
       if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
-        canvas.width = canvas.clientWidth || 520;
+        canvas.width = canvas.clientWidth || 420;
         canvas.height = canvas.clientHeight || 420;
       }
       const ctx = canvas.getContext('2d');
@@ -363,8 +416,6 @@
         ctx.arc(cx, cy, nm * pxPerNm, 0, Math.PI * 2);
         ctx.stroke();
       }
-
-      const interp = this.getInterpolatedState();
       if (!interp || !this.currSnapshot) return;
       const cosLat = Math.max(0.2, Math.cos((interp.subLat * Math.PI) / 180));
 
@@ -405,183 +456,70 @@
       ctx.fill();
     }
 
-    setPeriscopeZoom(direction) {
-      this.periscopeZoom = Math.max(1, Math.min(4, this.periscopeZoom + direction * 0.5));
-      const label = document.getElementById('periscope-zoom-label');
-      if (label) label.textContent = `MAG ${this.periscopeZoom.toFixed(1)}×`;
-      const fov = document.getElementById('periscope-fov');
-      if (fov) fov.textContent = `${(this.periscopeFovDeg / this.periscopeZoom).toFixed(0)}°`;
-    }
-
-    slewPeriscope(direction) {
-      this.periscopeBearingOffset = ((this.periscopeBearingOffset + direction * 5 + 540) % 360) - 180;
-      const heading = this.currSnapshot ? this.currSnapshot.ownSub.headingDeg : 90;
-      const azimuth = (heading + this.periscopeBearingOffset + 360) % 360;
-      const label = document.getElementById('periscope-azimuth');
-      if (label) label.textContent = `${Math.round(azimuth).toString().padStart(3, '0')}°`;
-    }
-
-    centerPeriscope() {
-      this.periscopeBearingOffset = 0;
-      const heading = this.currSnapshot ? this.currSnapshot.ownSub.headingDeg : 90;
-      const label = document.getElementById('periscope-azimuth');
-      if (label) label.textContent = `${Math.round(heading).toString().padStart(3, '0')}°`;
-    }
-
-    renderPeriscope() {
-      const canvas = document.getElementById('periscope-canvas');
-      if (!canvas) return;
-      if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
-        canvas.width = Math.max(1, canvas.clientWidth || 900);
-        canvas.height = Math.max(1, canvas.clientHeight || 480);
-      }
-
-      const ctx = canvas.getContext('2d');
-      if (!ctx) return;
-      const w = canvas.width;
-      const h = canvas.height;
-      const snap = this.currSnapshot;
-      const sub = snap ? snap.ownSub : { headingDeg: 90, depthM: 0 };
-      const env = snap ? snap.environment : { seaState: 2, windSpeedKts: 0 };
-      const seaState = Number(env.seaState) || 0;
-      const time = performance.now() * 0.00012;
-      const horizonY = Math.round(h * (0.535 + Math.min(0.035, seaState * 0.004)));
-
-      // Sky and haze: intentionally procedural, cosmetic presentation only.
-      const sky = ctx.createLinearGradient(0, 0, 0, horizonY);
-      sky.addColorStop(0, '#172b37');
-      sky.addColorStop(0.55, '#45616a');
-      sky.addColorStop(1, '#a3aaa0');
-      ctx.fillStyle = sky;
-      ctx.fillRect(0, 0, w, horizonY);
-
-      const haze = ctx.createLinearGradient(0, horizonY - h * 0.12, 0, horizonY + h * 0.08);
-      haze.addColorStop(0, 'rgba(185,196,184,0)');
-      haze.addColorStop(0.55, 'rgba(193,202,190,0.36)');
-      haze.addColorStop(1, 'rgba(173,190,185,0)');
-      ctx.fillStyle = haze;
-      ctx.fillRect(0, horizonY - h * 0.12, w, h * 0.2);
-
-      const water = ctx.createLinearGradient(0, horizonY, 0, h);
-      water.addColorStop(0, '#536b6b');
-      water.addColorStop(0.18, '#28464e');
-      water.addColorStop(1, '#081b27');
-      ctx.fillStyle = water;
-      ctx.fillRect(0, horizonY, w, h - horizonY);
-
-      // Stable, low-amplitude wavelets; no synthetic sensor returns.
-      const waveCount = Math.max(14, Math.floor(h / 15));
-      for (let i = 0; i < waveCount; i++) {
-        const yBase = horizonY + 12 + i * ((h - horizonY - 24) / waveCount);
-        const alpha = 0.035 + 0.055 * (i / waveCount);
-        const span = w * (0.18 + (i % 5) * 0.09);
-        const phase = time * (0.7 + i * 0.017) + i * 1.7;
-        ctx.strokeStyle = `rgba(190,211,202,${alpha.toFixed(3)})`;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        for (let x = 0; x <= span; x += 8) {
-          const y = yBase + Math.sin(x * (0.012 + i * 0.00012) + phase) * (1 + i / waveCount * 2.2);
-          if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-        }
-        ctx.stroke();
-      }
-
-      // Fine azimuth tape.
-      const fov = this.periscopeFovDeg / this.periscopeZoom;
-      ctx.fillStyle = 'rgba(4,13,18,0.46)';
-      ctx.fillRect(0, 0, w, 42);
-      const heading = ((Number(sub.headingDeg) || 0) + this.periscopeBearingOffset + 360) % 360;
-      const first = Math.floor((heading - fov / 2) / 5) * 5;
-      const last = Math.ceil((heading + fov / 2) / 5) * 5;
-      ctx.font = '10px Consolas, monospace';
-      ctx.textAlign = 'center';
-      for (let bearing = first; bearing <= last; bearing += 5) {
-        const relative = ((bearing - heading + 540) % 360) - 180;
-        const x = w / 2 + (relative / fov) * w;
-        if (x < -4 || x > w + 4) continue;
-        const major = ((bearing % 10) + 10) % 10 === 0;
-        ctx.strokeStyle = major ? 'rgba(219,239,230,.78)' : 'rgba(193,218,213,.38)';
-        ctx.beginPath();
-        ctx.moveTo(x, 0);
-        ctx.lineTo(x, major ? 15 : 9);
-        ctx.stroke();
-        if (major) {
-          ctx.fillStyle = 'rgba(230,241,232,.88)';
-          ctx.fillText(String((bearing + 360) % 360).padStart(3, '0'), x, 28);
-        }
-      }
-
-      // Reticle, stadia and center index.
-      ctx.save();
-      ctx.strokeStyle = 'rgba(209,237,222,0.64)';
-      ctx.lineWidth = 1;
-      ctx.beginPath();
-      ctx.moveTo(w * 0.5, 48); ctx.lineTo(w * 0.5, h - 28);
-      ctx.moveTo(18, horizonY); ctx.lineTo(w - 18, horizonY);
-      ctx.stroke();
-      ctx.beginPath(); ctx.arc(w * 0.5, h * 0.52, Math.min(w, h) * 0.055, 0, Math.PI * 2); ctx.stroke();
-      for (let i = -5; i <= 5; i++) {
-        const y = h * 0.52 + i * 18;
-        const tick = i === 0 ? 15 : 7;
-        ctx.beginPath(); ctx.moveTo(w * 0.5 - tick, y); ctx.lineTo(w * 0.5 + tick, y); ctx.stroke();
-      }
-      ctx.restore();
-
-      // Amber cues are server-ranged surface tracks only, never inferred optical detections.
-      const surfaceTracks = snap ? (snap.contacts || []).filter((c) =>
-        c.ranged && c.rangeNm !== null && c.rangeNm !== undefined &&
-        c.depthM !== null && c.depthM !== undefined && c.depthM <= 2.0 &&
-        ['MERCHANT', 'WARSHIP', 'SURFACE'].includes(String(c.category).toUpperCase())
-      ) : [];
-      let inFovCount = 0;
-      for (const track of surfaceTracks) {
-        const relative = ((track.bearingDeg - heading + 540) % 360) - 180;
-        if (Math.abs(relative) > fov / 2) continue;
-        inFovCount++;
-        const x = w / 2 + (relative / fov) * w;
-        const y = horizonY - 18;
-        ctx.strokeStyle = 'rgba(235,190,119,.95)';
-        ctx.fillStyle = 'rgba(245,199,128,.95)';
-        ctx.setLineDash([4, 4]);
-        ctx.beginPath(); ctx.moveTo(x, 42); ctx.lineTo(x, y - 10); ctx.stroke();
+    renderManeuveringStation() {
+      const prof = document.getElementById('maneuvering-profile-canvas');
+      if (prof && this.currSnapshot) {
+        const ctx = prof.getContext('2d');
+        const w = prof.width;
+        const h = prof.height;
+        ctx.fillStyle = '#030805';
+        ctx.fillRect(0, 0, w, h);
+        const sub = this.currSnapshot.ownSub;
+        const env = this.currSnapshot.environment;
+        const layerY = (env.thermoclineM / 400) * h;
+        ctx.strokeStyle = '#ffb000';
+        ctx.setLineDash([5, 4]);
+        ctx.beginPath(); ctx.moveTo(0, layerY); ctx.lineTo(w, layerY); ctx.stroke();
         ctx.setLineDash([]);
-        ctx.beginPath();
-        ctx.moveTo(x, y - 7); ctx.lineTo(x + 6, y); ctx.lineTo(x, y + 7); ctx.lineTo(x - 6, y); ctx.closePath();
-        ctx.fill();
-        ctx.font = '10px Consolas, monospace';
-        ctx.textAlign = x > w * 0.78 ? 'right' : 'left';
-        const labelX = x > w * 0.78 ? x - 10 : x + 10;
-        ctx.fillText(`${track.id} · ${Number(track.rangeNm).toFixed(1)} NM`, labelX, y - 10);
+        const subY = (Math.min(390, sub.depthM) / 400) * h;
+        ctx.fillStyle = '#00e5ff';
+        ctx.fillRect(w / 2 - 35, subY - 6, 70, 12);
+        ctx.font = '11px Courier New';
+        ctx.fillText(`${sub.name} @ ${sub.depthM.toFixed(0)}m (ORD ${sub.orderedDepthM.toFixed(0)}m)`, 14, 20);
       }
 
-      // Scope edge vignette and lower glass tint.
-      const vignette = ctx.createRadialGradient(w / 2, h / 2, h * 0.18, w / 2, h / 2, Math.max(w, h) * 0.68);
-      vignette.addColorStop(0, 'rgba(0,0,0,0)');
-      vignette.addColorStop(1, 'rgba(0,7,12,0.58)');
-      ctx.fillStyle = vignette;
-      ctx.fillRect(0, 0, w, h);
+      const svp = document.getElementById('svp-canvas');
+      if (svp) {
+        if (svp.width !== svp.clientWidth || svp.height !== svp.clientHeight) {
+          svp.width = svp.clientWidth || 300;
+          svp.height = svp.clientHeight || 300;
+        }
+        const ctx = svp.getContext('2d');
+        const w = svp.width;
+        const h = svp.height;
+        ctx.fillStyle = '#030805';
+        ctx.fillRect(0, 0, w, h);
+        const env = this.currSnapshot ? this.currSnapshot.environment : { thermoclineM: 85 };
+        const subDepth = this.currSnapshot ? this.currSnapshot.ownSub.depthM : 45;
+        const layerY = (env.thermoclineM / 400) * h;
+        ctx.strokeStyle = '#ffb000';
+        ctx.setLineDash([6, 4]);
+        ctx.beginPath(); ctx.moveTo(0, layerY); ctx.lineTo(w, layerY); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle = '#ffb000';
+        ctx.font = '10px Courier New';
+        ctx.fillText(`THERMOCLINE LAYER: ${env.thermoclineM}m`, 10, layerY - 6);
 
-      ctx.textAlign = 'left';
-      ctx.font = '9px Consolas, monospace';
-      ctx.fillStyle = 'rgba(231,194,137,.92)';
-      const cueText = snap
-        ? (inFovCount > 0 ? `SERVER-RANGED SURFACE TRACK CUES: ${inFovCount}` : 'NO RANGED SURFACE TRACK CUES IN CURRENT FOV')
-        : 'AWAITING AUTHORITATIVE WORLD SNAPSHOT';
-      ctx.fillText(cueText, 14, h - 16);
+        // Draw SVP velocity curve
+        ctx.strokeStyle = '#00ff66';
+        ctx.beginPath();
+        ctx.moveTo(w * 0.65, 0);
+        ctx.lineTo(w * 0.78, layerY);
+        ctx.lineTo(w * 0.35, layerY + 55);
+        ctx.lineTo(w * 0.58, h);
+        ctx.stroke();
 
-      const azimuthLabel = document.getElementById('periscope-azimuth');
-      if (azimuthLabel) azimuthLabel.textContent = `${Math.round(heading).toString().padStart(3, '0')}°`;
-      const fovLabel = document.getElementById('periscope-fov');
-      if (fovLabel) fovLabel.textContent = `${fov.toFixed(0)}°`;
-      const zoomLabel = document.getElementById('periscope-zoom-label');
-      if (zoomLabel) zoomLabel.textContent = `MAG ${this.periscopeZoom.toFixed(1)}×`;
+        const subY = (Math.min(400, subDepth) / 400) * h;
+        ctx.strokeStyle = '#00e5ff';
+        ctx.beginPath(); ctx.moveTo(0, subY); ctx.lineTo(w, subY); ctx.stroke();
+      }
     }
 
-    renderSvpCanvas() {
-      const canvas = document.getElementById('svp-canvas');
+    renderReactorSchematic() {
+      const canvas = document.getElementById('reactor-schematic-canvas');
       if (!canvas) return;
       if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
-        canvas.width = canvas.clientWidth || 500;
+        canvas.width = canvas.clientWidth || 520;
         canvas.height = canvas.clientHeight || 380;
       }
       const ctx = canvas.getContext('2d');
@@ -590,23 +528,61 @@
       ctx.fillStyle = '#030805';
       ctx.fillRect(0, 0, w, h);
 
-      const env = this.currSnapshot ? this.currSnapshot.environment : { thermoclineM: 85 };
-      const subDepth = this.currSnapshot ? this.currSnapshot.ownSub.depthM : 45;
-      const layerY = (env.thermoclineM / 400) * h;
-
-      ctx.strokeStyle = '#ffb000';
-      ctx.setLineDash([6, 4]);
-      ctx.beginPath(); ctx.moveTo(0, layerY); ctx.lineTo(w, layerY); ctx.stroke();
-      ctx.setLineDash([]);
+      ctx.strokeStyle = '#00ff66';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(40, 70, 110, 170);
       ctx.fillStyle = '#ffb000';
-      ctx.font = '11px Courier New';
-      ctx.fillText(`THERMOCLINE LAYER: ${env.thermoclineM}m`, 12, layerY - 6);
-
-      const subY = (Math.min(400, subDepth) / 400) * h;
-      ctx.strokeStyle = '#00e5ff';
-      ctx.beginPath(); ctx.moveTo(0, subY); ctx.lineTo(w, subY); ctx.stroke();
+      ctx.font = 'bold 12px Courier New';
+      ctx.fillText('S9G REACTOR', 52, 95);
       ctx.fillStyle = '#00e5ff';
-      ctx.fillText(`OWN KEEL DEPTH: ${subDepth.toFixed(0)}m`, 12, subY + 14);
+      ctx.fillRect(195, 70, 95, 170);
+      ctx.fillStyle = '#030805';
+      ctx.fillText('STEAM GEN', 208, 155);
+      ctx.strokeStyle = '#00ff66';
+      ctx.strokeRect(335, 95, 130, 120);
+      ctx.fillStyle = '#00ff66';
+      ctx.fillText('MAIN TURBINE', 352, 155);
+    }
+
+    renderRadarEsmCanvas(selectedContactId) {
+      const canvas = document.getElementById('radar-esm-canvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      const cx = w / 2;
+      const cy = h / 2;
+      const rMax = Math.min(cx, cy) - 16;
+
+      ctx.fillStyle = '#030805';
+      ctx.fillRect(0, 0, w, h);
+      ctx.strokeStyle = '#143824';
+      [0.33, 0.66, 1.0].forEach((f) => {
+        ctx.beginPath(); ctx.arc(cx, cy, rMax * f, 0, Math.PI * 2); ctx.stroke();
+      });
+
+      this.radarSweepDeg = (this.radarSweepDeg + 2.4) % 360;
+      const sRad = (this.radarSweepDeg * Math.PI) / 180;
+      ctx.strokeStyle = 'rgba(0, 255, 102, 0.55)';
+      ctx.beginPath();
+      ctx.moveTo(cx, cy);
+      ctx.lineTo(cx + Math.sin(sRad) * rMax, cy - Math.cos(sRad) * rMax);
+      ctx.stroke();
+
+      if (!this.currSnapshot) return;
+      for (const c of this.currSnapshot.contacts || []) {
+        const bRad = (c.bearingDeg * Math.PI) / 180;
+        const col = c.id === selectedContactId ? '#ffb000' : c.allegiance === 'HOSTILE' ? '#ff3b3b' : '#00e5ff';
+        ctx.strokeStyle = col;
+        ctx.fillStyle = col;
+        const sx = cx + Math.sin(bRad) * (rMax - 4);
+        const sy = cy - Math.cos(bRad) * (rMax - 4);
+        ctx.beginPath();
+        ctx.arc(sx, sy, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.font = '9px Courier New';
+        ctx.fillText(c.id, sx - 12, sy - 7);
+      }
     }
   }
 

@@ -109,7 +109,13 @@ async fn ws_handler(
 
 pub fn build_router(rooms: Arc<RoomManager>, config: &ServerConfig) -> Router {
     let static_dir = config.static_dir.clone();
-    let app = Router::new()
+    let assets_dir = if std::path::Path::new("../assets").exists() {
+        std::path::PathBuf::from("../assets")
+    } else {
+        std::path::PathBuf::from("assets")
+    };
+
+    let mut app = Router::new()
         .route("/healthz", get(healthz))
         .route("/status", get(status))
         .route("/rooms", get(list_rooms))
@@ -118,6 +124,9 @@ pub fn build_router(rooms: Arc<RoomManager>, config: &ServerConfig) -> Router {
         .with_state(rooms)
         .layer(CorsLayer::permissive());
 
+    if assets_dir.exists() {
+        app = app.nest_service("/assets", ServeDir::new(assets_dir));
+    }
     if static_dir.exists() {
         app.fallback_service(ServeDir::new(static_dir))
     } else {
