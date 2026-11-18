@@ -86,7 +86,7 @@
     document.getElementById('periscope-sea-state').textContent = `SS-${env.seaState}`;
     document.getElementById('periscope-azimuth').textContent = `${Math.round(sub.headingDeg).toString().padStart(3, '0')}°`;
     document.getElementById('periscope-weather').textContent = `WIND ${Math.round(env.windSpeedKts)} KT`;
-    const surfaceTracks = contacts.filter((c) =>
+    const surfaceTracks = (snap.contacts || []).filter((c) =>
       c.ranged && c.rangeNm !== null && c.rangeNm !== undefined &&
       c.depthM !== null && c.depthM !== undefined && c.depthM <= 2.0 &&
       ['MERCHANT', 'WARSHIP', 'SURFACE'].includes(String(c.category).toUpperCase())
