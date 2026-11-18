@@ -19,7 +19,10 @@ The original single-player simulator at the repository root (`index.html`, `js/`
 - **`multiplayer/protocol/v1/`**:
   - Versioned JSON WebSocket contract (`v1`) decoupled from internal Rust structs.
 - **`multiplayer/client/`**:
-  - Standalone HTML5/Canvas/JS thin client that connects via WebSocket, renders the server-provided tactical plot and telemetry, measures RTT via `PING`/`PONG`, and submits validated orders.
+  - Standalone HTML5/Canvas/JS client with six stations: Tactical Plot, Sonar/TMA, Fire Control, Environment, Platform Status, and Periscope/ESM.
+  - The F6 periscope view renders a procedural optical-style horizon from client-side presentation code and overlays only server-ranged surface-track cues. These cues are explicitly not represented as optical detections.
+  - The ESM panel is a reserved interface only: protocol v1 does not yet publish emitter detections or bearing-of-arrival data, so the client deliberately generates no synthetic ESM contacts.
+  - The client connects via WebSocket, renders authorized snapshots, measures RTT via `PING`/`PONG`, and submits validated orders.
 
 ---
 
