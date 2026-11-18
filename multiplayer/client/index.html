@@ -77,6 +77,7 @@
         <button class="station-tab" data-station="weapons" type="button"><span class="tab-code">03</span> FIRE CONTROL</button>
         <button class="station-tab" data-station="maneuvering" type="button"><span class="tab-code">04</span> ENVIRONMENT</button>
         <button class="station-tab" data-station="damage" type="button"><span class="tab-code">05</span> PLATFORM STATUS</button>
+        <button class="station-tab" data-station="periscope" type="button"><span class="tab-code">06</span> PERISCOPE / ESM</button>
       </nav>
     </header>
 
@@ -241,6 +242,67 @@
               <p>The server owns world state and validates every order. The client renders the authorized operational picture and reports player intent.</p>
               <div class="command-note">WORLD UPDATES ARE SERVER-ORIGINATED<br/>CLIENT STATE IS PRESENTATION ONLY</div>
             </section>
+          </div>
+        </section>
+
+        <section id="screen-periscope" class="station-screen">
+          <div class="periscope-layout">
+            <section class="surface-panel periscope-main">
+              <div class="panel-title-row periscope-title">
+                <div>
+                  <div class="eyebrow">OPTICAL STATION / 06</div>
+                  <h2>PHOTONICS <span>MAST</span></h2>
+                </div>
+                <div class="periscope-readouts">
+                  <div><span class="hud-label">TRUE HEADING</span><strong id="periscope-heading">---°</strong></div>
+                  <div><span class="hud-label">PLATFORM DEPTH</span><strong id="periscope-depth">-- M</strong></div>
+                  <div><span class="hud-label">SEA STATE</span><strong id="periscope-sea-state">--</strong></div>
+                </div>
+              </div>
+              <div class="periscope-frame">
+                <div class="periscope-frame-top">
+                  <span><i class="live-dot"></i> SURFACE OPTICAL VIEW</span>
+                  <span id="periscope-zoom-label">MAG 1.0×</span>
+                </div>
+                <canvas id="periscope-canvas" aria-label="Stylized periscope optical view with heading reticle and server-ranged surface track cues"></canvas>
+                <div class="periscope-frame-bottom">
+                  <span>AZIMUTH <strong id="periscope-azimuth">---°</strong></span>
+                  <span>FOV <strong id="periscope-fov">60°</strong></span>
+                  <span>SEA <strong id="periscope-weather">--</strong></span>
+                </div>
+                <div class="periscope-corner corner-tl"></div><div class="periscope-corner corner-tr"></div>
+                <div class="periscope-corner corner-bl"></div><div class="periscope-corner corner-br"></div>
+              </div>
+              <div class="periscope-toolbar">
+                <div class="periscope-disclaimer"><span class="disclaimer-mark">i</span> Procedural optical presentation. Amber cues indicate server-ranged surface tracks, not independent optical detections.</div>
+                <div class="zoom-controls">
+                  <button id="btn-periscope-zoom-out" class="secondary-btn compact" type="button" aria-label="Decrease periscope magnification">−</button>
+                  <button id="btn-periscope-zoom-in" class="secondary-btn compact" type="button" aria-label="Increase periscope magnification">+</button>
+                </div>
+              </div>
+            </section>
+
+            <aside class="periscope-side">
+              <section class="surface-panel periscope-track-panel">
+                <div class="eyebrow">SERVER-VISIBLE SURFACE PICTURE</div>
+                <div class="periscope-side-heading"><h2>TRACK <span>CUES</span></h2><span id="periscope-track-count" class="count-chip">0</span></div>
+                <div id="periscope-track-list" class="periscope-track-list"><div class="muted">No ranged surface tracks.</div></div>
+                <p class="display-footnote">Only surface contacts with a server-provided range are listed. Their positions remain subject to server visibility rules.</p>
+              </section>
+
+              <section class="surface-panel esm-panel">
+                <div class="eyebrow">ELECTRONIC SUPPORT MEASURES</div>
+                <h2>ESM <span>RECEIVER</span></h2>
+                <div class="esm-status"><span class="esm-status-dot"></span><strong>CHANNEL NOT AVAILABLE</strong></div>
+                <p>The V1 server protocol does not yet publish emitter detections, signal parameters or bearing-of-arrival data.</p>
+                <div class="esm-fields">
+                  <div><span>EMITTER LIBRARY</span><b>NOT CONNECTED</b></div>
+                  <div><span>BEARING OF ARRIVAL</span><b>—</b></div>
+                  <div><span>IDENTIFICATION</span><b>—</b></div>
+                </div>
+                <div class="command-note">ESM DISPLAY RESERVED FOR A FUTURE SERVER SENSOR FEED. NO SYNTHETIC CONTACTS ARE GENERATED.</div>
+              </section>
+            </aside>
           </div>
         </section>
       </section>
