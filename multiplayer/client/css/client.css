@@ -274,3 +274,65 @@ button:disabled { opacity: .38; cursor: not-allowed; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
 }
+
+/* F6 — Periscope / ESM */
+.station-tab[data-station="periscope"] .tab-code { color: var(--amber); }
+.periscope-layout { display: grid; grid-template-columns: minmax(0, 1fr) 288px; gap: 12px; flex: 1; min-width: 0; min-height: 0; }
+.periscope-main { display: flex; flex-direction: column; padding: 16px; }
+.periscope-title { align-items: center; margin-bottom: 5px; }
+.periscope-readouts { display: flex; gap: 20px; }
+.periscope-readouts > div { display: flex; flex-direction: column; gap: 5px; min-width: 70px; }
+.periscope-readouts strong { color: var(--cyan); font: 12px var(--mono); }
+.periscope-frame { position: relative; flex: 1; min-height: 300px; overflow: hidden; border: 1px solid #35505a; border-radius: 5px; background: #08141b; box-shadow: inset 0 0 50px rgba(0,0,0,.45); }
+#periscope-canvas { display: block; width: 100%; height: 100%; min-height: 300px; }
+.periscope-frame-top, .periscope-frame-bottom { position: absolute; z-index: 2; left: 0; right: 0; display: flex; justify-content: space-between; gap: 12px; padding: 9px 12px; color: #c1d6d8; background: linear-gradient(180deg, rgba(3,11,16,.88), rgba(3,11,16,.15)); font: 9px var(--mono); letter-spacing: .09em; pointer-events: none; }
+.periscope-frame-top { top: 0; }
+.periscope-frame-top > span:first-child { color: var(--green-strong); }
+.periscope-frame-bottom { bottom: 0; background: linear-gradient(0deg, rgba(3,11,16,.9), rgba(3,11,16,.12)); }
+.periscope-frame-bottom strong { color: var(--cyan); font-weight: 600; }
+.periscope-toolbar { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding-top: 11px; }
+.periscope-disclaimer { display: flex; align-items: center; gap: 8px; max-width: 760px; color: var(--muted); font-size: 10px; line-height: 1.45; }
+.disclaimer-mark { display: inline-flex; flex: 0 0 16px; width: 16px; height: 16px; align-items: center; justify-content: center; border: 1px solid var(--line-strong); border-radius: 50%; color: var(--cyan); font: 10px var(--mono); }
+.zoom-controls { display: flex; gap: 5px; }
+.zoom-controls button { min-width: 32px; font-size: 16px; }
+.periscope-side { display: grid; grid-template-rows: minmax(0, 1fr) minmax(0, .9fr); gap: 12px; min-height: 0; }
+.periscope-track-panel, .esm-panel { display: flex; flex-direction: column; padding: 15px; min-height: 0; }
+.periscope-side-heading { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.periscope-side-heading h2 { margin: 2px 0 0; color: #e5eeee; font: 600 17px var(--sans); }
+.periscope-side-heading h2 span, .esm-panel h2 span { color: var(--muted); font-weight: 400; }
+.periscope-track-list { display: flex; flex-direction: column; gap: 7px; flex: 1; min-height: 80px; margin-top: 10px; overflow-y: auto; }
+.periscope-track { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 5px 10px; padding: 9px; border: 1px solid var(--line); border-radius: 4px; background: rgba(5,15,21,.52); }
+.periscope-track strong { color: var(--amber); font: 10px var(--mono); }
+.periscope-track span { color: var(--text-soft); font: 9px var(--mono); text-align: right; }
+.periscope-track small { grid-column: 1 / -1; color: var(--muted); font: 8px var(--mono); }
+.esm-panel h2 { margin: 3px 0 0; color: #e5eeee; font: 600 18px var(--sans); }
+.esm-status { display: flex; align-items: center; gap: 8px; margin: 8px 0 0; color: var(--amber); font: 8px var(--mono); letter-spacing: .08em; }
+.esm-status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--amber); box-shadow: 0 0 7px rgba(229,183,111,.35); }
+.esm-panel p { margin: 0; color: var(--text-soft); font-size: 10px; line-height: 1.55; }
+.esm-fields { display: flex; flex-direction: column; gap: 8px; padding: 10px; border: 1px solid var(--line); border-radius: 4px; background: rgba(5,15,21,.4); }
+.esm-fields > div { display: flex; justify-content: space-between; gap: 8px; color: var(--muted); font: 8px var(--mono); }
+.esm-fields b { color: var(--muted-dim); font-weight: 500; text-align: right; }
+.esm-panel .command-note { margin-top: auto; font-size: 8px; }
+.periscope-corner { position: absolute; z-index: 1; width: 19px; height: 19px; border-color: rgba(177,220,215,.46); border-style: solid; pointer-events: none; }
+.corner-tl { top: 6px; left: 6px; border-width: 1px 0 0 1px; }
+.corner-tr { top: 6px; right: 6px; border-width: 1px 1px 0 0; }
+.corner-bl { bottom: 6px; left: 6px; border-width: 0 0 1px 1px; }
+.corner-br { bottom: 6px; right: 6px; border-width: 0 1px 1px 0; }
+
+@media (max-width: 1280px) {
+  .periscope-layout { grid-template-columns: minmax(0, 1fr) 260px; }
+  .periscope-readouts { gap: 12px; }
+}
+@media (max-width: 980px) {
+  .periscope-layout { grid-template-columns: minmax(0, 1fr); }
+  .periscope-frame { min-height: 340px; }
+  .periscope-side { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: minmax(190px, auto); }
+  .periscope-track-panel, .esm-panel { min-height: 210px; }
+}
+@media (max-width: 700px) {
+  .periscope-title { align-items: flex-start; flex-direction: column; }
+  .periscope-readouts { width: 100%; justify-content: space-between; }
+  .periscope-side { grid-template-columns: minmax(0, 1fr); }
+  .periscope-frame { min-height: 300px; }
+  .periscope-toolbar { align-items: flex-start; }
+}
