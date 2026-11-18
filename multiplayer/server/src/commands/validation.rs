@@ -56,6 +56,16 @@ pub fn validate_and_apply_command(
 
     match command {
         "SET_HEADING" => {
+            if !session.role.can_helm() {
+                return (
+                    CommandResultPayload {
+                        accepted: false,
+                        command: command.to_string(),
+                        message: format!("Role {} cannot issue helm orders.", session.role.as_str()),
+                    },
+                    None,
+                );
+            }
             if !(0.0..=360.0).contains(&value) {
                 return (
                     CommandResultPayload {
@@ -84,6 +94,16 @@ pub fn validate_and_apply_command(
             )
         }
         "SET_SPEED" => {
+            if !session.role.can_helm() {
+                return (
+                    CommandResultPayload {
+                        accepted: false,
+                        command: command.to_string(),
+                        message: format!("Role {} cannot issue speed orders.", session.role.as_str()),
+                    },
+                    None,
+                );
+            }
             if !(-5.0..=world.own_sub.max_speed_kts).contains(&value) {
                 return (
                     CommandResultPayload {
@@ -114,6 +134,16 @@ pub fn validate_and_apply_command(
             )
         }
         "SET_DEPTH" => {
+            if !session.role.can_helm() {
+                return (
+                    CommandResultPayload {
+                        accepted: false,
+                        command: command.to_string(),
+                        message: format!("Role {} cannot issue depth orders.", session.role.as_str()),
+                    },
+                    None,
+                );
+            }
             if !(0.0..=world.own_sub.max_depth_m).contains(&value) {
                 return (
                     CommandResultPayload {
@@ -139,6 +169,100 @@ pub fn validate_and_apply_command(
                     accepted: true,
                     command: command.to_string(),
                     message: format!("Depth order {:.0} m accepted.", value),
+                },
+                Some(event),
+            )
+        }
+        "ACTIVE_PING" => {
+            if !session.role.can_sonar() {
+                return (
+                    CommandResultPayload {
+                        accepted: false,
+                        command: command.to_string(),
+                        message: format!("Role {} cannot transmit active sonar.", session.role.as_str()),
+                    },
+                    None,
+                );
+            }
+            if world.own_sub.active_ping_cooldown_sec > 0.0 {
+                return (
+                    CommandResultPayload {
+                        accepted: false,
+                        command: command.to_string(),
+                        message: format!(
+                            "Active sonar recharging ({:.1}s).",
+                            world.own_sub.active_ping_cooldown_sec
+                        ),
+                    },
+                    None,
+                );
+            }
+            let echoes = world.trigger_active_ping();
+            let event = WorldEventPayload {
+                event_id: world.next_event_id(),
+                server_tick: world.tick,
+                category: "SONAR".to_string(),
+                message: format!(
+                    "{} transmitted 3.5 kHz Active Ping ({} echo returns).",
+                    session.client_name, echoes
+                ),
+            };
+            (
+                CommandResultPayload {
+                    accepted: true,
+                    command: command.to_string(),
+                    message: format!("Active ping transmitted ({echoes} echoes)."),
+                },
+                Some(event),
+            )
+        }
+        "FIRE_TUBE" => {
+            if !session.role.can_weapons() {
+                return (
+                    CommandResultPayload {
+                        accepted: false,
+                        command: command.to_string(),
+                        message: format!("Role {} cannot fire torpedoes.", session.role.as_str()),
+                    },
+                    None,
+                );
+            }
+            if !(0.0..=360.0).contains(&value) {
+                return (
+                    CommandResultPayload {
+                        accepted: false,
+                        command: command.to_string(),
+                        message: format!("Launch bearing {value} out of valid range [0, 360]."),
+                    },
+                    None,
+                );
+            }
+            if world.own_sub.torpedoes_remaining == 0 {
+                return (
+                    CommandResultPayload {
+                        accepted: false,
+                        command: command.to_string(),
+                        message: "No MK-48 ADCAP torpedoes remaining.".to_string(),
+                    },
+                    None,
+                );
+            }
+            let brg = normalize_heading(value);
+            let wep_id = world.launch_torpedo(brg);
+            let event = WorldEventPayload {
+                event_id: world.next_event_id(),
+                server_tick: world.tick,
+                category: "WEPS".to_string(),
+                message: format!(
+                    "{} launched {} bearing {:03.0}° TRUE!",
+                    session.client_name, wep_id, brg
+                ),
+            };
+            (
+                CommandResultPayload {
+                    accepted: true,
+                    command: command.to_string(),
+                    message: format!("{wep_id} away bearing {brg:03.0}°."),
                 },
                 Some(event),
             )

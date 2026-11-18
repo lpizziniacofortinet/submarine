@@ -20,6 +20,14 @@
         <label>CALLSIGN:
           <input id="input-callsign" type="text" value="CONN-ALPHA" maxlength="32" />
         </label>
+        <label>ROLE:
+          <select id="select-role">
+            <option value="COMMANDER">COMMANDER</option>
+            <option value="CONN">CONN (HELM)</option>
+            <option value="SONAR">SONAR</option>
+            <option value="WEPS">WEPS</option>
+          </select>
+        </label>
         <button id="btn-connect" class="btn primary">CONNECT</button>
         <button id="btn-disconnect" class="btn" disabled>DISCONNECT</button>
         <span id="conn-pill" class="pill offline">DISCONNECTED</span>
@@ -28,6 +36,7 @@
 
     <section class="telemetry-strip">
       <div><span>WORLD:</span> <strong id="val-world-id">--</strong></div>
+      <div><span>ROLE:</span> <strong id="val-role">--</strong></div>
       <div><span>SESSION:</span> <strong id="val-session-id">--</strong></div>
       <div><span>SERVER TICK:</span> <strong id="val-tick">0</strong></div>
       <div><span>SIM TIME:</span> <strong id="val-sim-time">0.0 s</strong></div>
@@ -52,10 +61,11 @@
           <div class="kv"><span>HEADING / ORD</span><strong id="sub-hdg">--</strong></div>
           <div class="kv"><span>SPEED / ORD</span><strong id="sub-spd">--</strong></div>
           <div class="kv"><span>DEPTH / ORD</span><strong id="sub-dep">--</strong></div>
+          <div class="kv"><span>MK-48 ADCAP</span><strong id="sub-torps">--</strong></div>
         </section>
 
         <section class="panel">
-          <div class="panel-title"><span>CONN ORDERS (SERVER-VALIDATED)</span></div>
+          <div class="panel-title"><span>CONN, SONAR &amp; WEPS ORDERS</span></div>
           <div class="order-row">
             <label>HEADING (0–360°)
               <input id="order-heading" type="number" min="0" max="360" step="1" value="90" />
@@ -74,6 +84,13 @@
             </label>
             <button id="btn-set-depth" class="btn">ORDER DEP</button>
           </div>
+          <div class="order-row">
+            <label>TORPEDO BRG (0–360°)
+              <input id="order-torp-brg" type="number" min="0" max="360" step="1" value="45" />
+            </label>
+            <button id="btn-fire-torp" class="btn">FIRE MK-48</button>
+          </div>
+          <button id="btn-active-ping" class="btn primary">ACTIVE SONAR PING (3.5 kHz)</button>
           <div id="cmd-ack" class="cmd-ack">Awaiting orders...</div>
         </section>
 

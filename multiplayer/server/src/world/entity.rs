@@ -14,6 +14,9 @@ pub struct AuthoritativeSubmarine {
     pub ordered_depth_m: f64,
     pub max_speed_kts: f64,
     pub max_depth_m: f64,
+    pub torpedoes_remaining: u32,
+    pub active_ping_cooldown_sec: f64,
+    pub towed_array_deployed: bool,
     // Private authoritative fields (never exposed in snapshots)
     pub internal_reactor_power_mw: f64,
     pub internal_noise_db: f64,
@@ -21,6 +24,10 @@ pub struct AuthoritativeSubmarine {
 
 impl AuthoritativeSubmarine {
     pub fn step(&mut self, dt_sec: f64) {
+        if self.active_ping_cooldown_sec > 0.0 {
+            self.active_ping_cooldown_sec = (self.active_ping_cooldown_sec - dt_sec).max(0.0);
+        }
+
         // Turn toward ordered heading (up to 3.0 deg/sec)
         let diff = shortest_angle_diff(self.heading_deg, self.ordered_heading_deg);
         let max_turn = 3.0 * dt_sec;
@@ -48,19 +55,24 @@ impl AuthoritativeSubmarine {
             self.depth_m += depth_diff.signum() * max_dive;
         }
 
-        let (new_lat, new_lon) = advance_position(self.lat, self.lon, self.heading_deg, self.speed_kts, dt_sec);
+        let (new_lat, new_lon) =
+            advance_position(self.lat, self.lon, self.heading_deg, self.speed_kts, dt_sec);
         self.lat = new_lat;
         self.lon = new_lon;
 
         // Internal-only acoustic/reactor telemetry
         self.internal_reactor_power_mw = 12.0 + self.speed_kts.abs() * 4.5;
-        self.internal_noise_db = 92.0 + self.speed_kts.abs() * 1.4;
+        let cavitation_penalty = if self.speed_kts.abs() > 16.0 && self.depth_m < 80.0 {
+            14.0
+        } else {
+            0.0
+        };
+        self.internal_noise_db = 92.0 + self.speed_kts.abs() * 1.4 + cavitation_penalty;
     }
 }
 
 /// Authoritative contact entity.
-/// Hidden contacts (`detectable_by_client == false`) and internal AI/weapon fields
-/// must never be leaked to clients.
+/// Hidden contacts and internal AI/weapon fields must never be leaked to clients.
 #[derive(Debug, Clone)]
 pub struct AuthoritativeContact {
     pub id: String,
@@ -72,7 +84,9 @@ pub struct AuthoritativeContact {
     pub heading_deg: f64,
     pub speed_kts: f64,
     pub depth_m: f64,
-    pub detectable_by_client: bool,
+    pub base_radiated_noise_db: f64,
+    pub active_range_lock_sec: f64,
+    pub sunk: bool,
     // Private authoritative fields (never exposed in snapshots)
     pub internal_ai_state: String,
     pub internal_weapon_load: u32,
@@ -80,7 +94,48 @@ pub struct AuthoritativeContact {
 
 impl AuthoritativeContact {
     pub fn step(&mut self, dt_sec: f64) {
-        let (new_lat, new_lon) = advance_position(self.lat, self.lon, self.heading_deg, self.speed_kts, dt_sec);
+        if self.sunk {
+            return;
+        }
+        if self.active_range_lock_sec > 0.0 {
+            self.active_range_lock_sec = (self.active_range_lock_sec - dt_sec).max(0.0);
+        }
+        let (new_lat, new_lon) =
+            advance_position(self.lat, self.lon, self.heading_deg, self.speed_kts, dt_sec);
+        self.lat = new_lat;
+        self.lon = new_lon;
+    }
+
+    pub fn radiated_noise_db(&self) -> f64 {
+        self.base_radiated_noise_db + self.speed_kts.abs() * 1.15
+    }
+}
+
+/// Authoritative torpedo entity (MK-48 ADCAP).
+#[derive(Debug, Clone)]
+pub struct AuthoritativeTorpedo {
+    pub id: String,
+    pub lat: f64,
+    pub lon: f64,
+    pub heading_deg: f64,
+    pub speed_kts: f64,
+    pub depth_m: f64,
+    pub remaining_life_sec: f64,
+    pub exploded: bool,
+}
+
+impl AuthoritativeTorpedo {
+    pub fn step(&mut self, dt_sec: f64) {
+        if self.exploded {
+            return;
+        }
+        self.remaining_life_sec -= dt_sec;
+        if self.remaining_life_sec <= 0.0 {
+            self.exploded = true;
+            return;
+        }
+        let (new_lat, new_lon) =
+            advance_position(self.lat, self.lon, self.heading_deg, self.speed_kts, dt_sec);
         self.lat = new_lat;
         self.lon = new_lon;
     }
@@ -93,6 +148,39 @@ pub struct EnvironmentState {
     pub water_depth_m: f64,
     pub wind_speed_kts: f64,
     pub wind_dir_deg: f64,
+}
+
+/// Computes passive sonar signal-to-noise ratio (dB) on the authoritative server.
+/// Contacts with SNR < 0 dB are undetectable and must not appear in client snapshots.
+pub fn compute_passive_sonar_snr(
+    sub: &AuthoritativeSubmarine,
+    contact: &AuthoritativeContact,
+    thermocline_m: f64,
+) -> (f64, f64, f64) {
+    let (bearing_deg, range_nm) =
+        bearing_and_range_nm(sub.lat, sub.lon, contact.lat, contact.lon);
+    let range_m = (range_nm * 1852.0).max(50.0);
+    let spreading_loss_db = 20.0 * range_m.log10();
+    let absorption_db = 0.25 * range_nm;
+
+    let same_side_of_layer =
+        (sub.depth_m <= thermocline_m && contact.depth_m <= thermocline_m)
+            || (sub.depth_m > thermocline_m && contact.depth_m > thermocline_m);
+    let layer_loss_db = if same_side_of_layer { 0.0 } else { 9.0 };
+
+    let rel_brg = normalize_heading(bearing_deg - sub.heading_deg);
+    let in_baffles = !sub.towed_array_deployed && (150.0..=210.0).contains(&rel_brg);
+    let baffle_loss_db = if in_baffles { 18.0 } else { 0.0 };
+
+    let self_noise_db = 54.0 + (sub.internal_noise_db - 92.0) * 0.45;
+    let snr_db = contact.radiated_noise_db()
+        - spreading_loss_db
+        - absorption_db
+        - layer_loss_db
+        - baffle_loss_db
+        - (self_noise_db - 45.0);
+
+    (bearing_deg, range_nm, snr_db)
 }
 
 pub fn normalize_heading(deg: f64) -> f64 {
@@ -113,7 +201,13 @@ pub fn shortest_angle_diff(from_deg: f64, to_deg: f64) -> f64 {
     d
 }
 
-pub fn advance_position(lat: f64, lon: f64, heading_deg: f64, speed_kts: f64, dt_sec: f64) -> (f64, f64) {
+pub fn advance_position(
+    lat: f64,
+    lon: f64,
+    heading_deg: f64,
+    speed_kts: f64,
+    dt_sec: f64,
+) -> (f64, f64) {
     let dist_nm = speed_kts * (dt_sec / 3600.0);
     let rad = heading_deg.to_radians();
     let d_lat = (dist_nm * rad.cos()) / 60.0;

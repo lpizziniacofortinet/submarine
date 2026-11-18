@@ -16,6 +16,7 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
 
     // Reliable bounded channel for discrete control messages (WELCOME, PONG, COMMAND_RESULT, WORLD_EVENT, ERROR)
     let (ctrl_tx, mut ctrl_rx) = mpsc::channel::<ServerMessage>(64);
+    let (handshake_tx, mut handshake_rx) = tokio::sync::watch::channel(false);
     let mut snapshot_rx = runtime.snapshot_tx.subscribe();
     let mut event_rx = runtime.event_tx.subscribe();
 
@@ -25,6 +26,27 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
     // Writer task: prioritizes discrete control/event messages and forwards latest snapshot without stale queueing
     let writer_handle = tokio::spawn(async move {
         loop {
+            let ready = *handshake_rx.borrow_and_update();
+            if !ready {
+                tokio::select! {
+                    biased;
+                    Some(msg) = ctrl_rx.recv() => {
+                        if let Ok(json) = serde_json::to_string(&msg) {
+                            if ws_sender.send(Message::Text(json)).await.is_err() {
+                                break;
+                            }
+                        }
+                    }
+                    changed = handshake_rx.changed() => {
+                        if changed.is_err() {
+                            break;
+                        }
+                    }
+                    else => break,
+                }
+                continue;
+            }
+
             tokio::select! {
                 biased;
                 Some(msg) = ctrl_rx.recv() => {
@@ -109,7 +131,7 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
 
                 let (session, reconnected) = {
                     let mut mgr = runtime.sessions.lock().await;
-                    mgr.connect_or_resume(hello.client_name, hello.session_id)
+                    mgr.connect_or_resume(hello.client_name, hello.session_id, hello.role)
                 };
                 session_id = Some(session.session_id.clone());
                 handshake_complete = true;
@@ -119,7 +141,7 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
                     w.world_id.clone()
                 };
 
-                info!(session_id = %session.session_id, client = %session.client_name, reconnected, "WebSocket client handshake complete");
+                info!(session_id = %session.session_id, client = %session.client_name, role = %session.role.as_str(), reconnected, "WebSocket client handshake complete");
 
                 let _ = ctrl_tx
                     .send(ServerMessage::Welcome {
@@ -127,6 +149,7 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
                         payload: WelcomePayload {
                             session_id: session.session_id.clone(),
                             world_id,
+                            assigned_role: session.role.as_str().to_string(),
                             sim_hz: runtime.config.sim_hz,
                             snapshot_hz: runtime.config.snapshot_hz,
                             reconnected,
@@ -142,6 +165,7 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
                         payload: (*initial_snap).clone(),
                     })
                     .await;
+                let _ = handshake_tx.send(true);
             }
             "PING" => {
                 if !handshake_complete {

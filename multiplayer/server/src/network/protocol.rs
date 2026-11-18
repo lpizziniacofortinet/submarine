@@ -20,6 +20,8 @@ pub struct HelloPayload {
     pub client_name: String,
     #[serde(default)]
     pub session_id: Option<String>,
+    #[serde(default)]
+    pub role: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -76,6 +78,7 @@ pub enum ServerMessage {
 pub struct WelcomePayload {
     pub session_id: String,
     pub world_id: String,
+    pub assigned_role: String,
     pub sim_hz: u32,
     pub snapshot_hz: u32,
     pub reconnected: bool,
@@ -90,6 +93,7 @@ pub struct ClientWorldSnapshot {
     pub snapshot_seq: u64,
     pub own_sub: ClientOwnSubView,
     pub contacts: Vec<ClientContactView>,
+    pub weapons: Vec<ClientWeaponView>,
     pub environment: ClientEnvironmentView,
 }
 
@@ -106,6 +110,8 @@ pub struct ClientOwnSubView {
     pub ordered_speed_kts: f64,
     pub depth_m: f64,
     pub ordered_depth_m: f64,
+    pub torpedoes_remaining: u32,
+    pub active_ping_cooldown_sec: f64,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -115,10 +121,25 @@ pub struct ClientContactView {
     pub designation: String,
     pub category: String,
     pub allegiance: String,
+    pub bearing_deg: f64,
+    pub snr_db: f64,
+    pub ranged: bool,
+    // Strictly None unless ranged by active sonar or close-in visual/ESM
+    pub lat: Option<f64>,
+    pub lon: Option<f64>,
+    pub range_nm: Option<f64>,
+    pub heading_deg: Option<f64>,
+    pub speed_kts: Option<f64>,
+    pub depth_m: Option<f64>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientWeaponView {
+    pub id: String,
+    pub weapon_type: String,
     pub lat: f64,
     pub lon: f64,
-    pub bearing_deg: f64,
-    pub range_nm: f64,
     pub heading_deg: f64,
     pub speed_kts: f64,
     pub depth_m: f64,

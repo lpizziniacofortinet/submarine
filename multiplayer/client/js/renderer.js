@@ -78,26 +78,44 @@
       const subHdg = lerpAngleDeg(s0.headingDeg, s1.headingDeg, alpha);
       const cosLat = Math.max(0.2, Math.cos((subLat * Math.PI) / 180));
 
-      // Draw server-visible contacts
+      // Draw server-visible contacts (bearing-only rays when passive, exact markers when ranged)
       for (const c1 of this.currSnapshot.contacts || []) {
+        const color = c1.allegiance === 'HOSTILE' ? '#ff3b3b' : c1.allegiance === 'NEUTRAL' ? '#00ff66' : '#ffb000';
+        ctx.strokeStyle = color;
+        ctx.fillStyle = color;
+
+        if (!c1.ranged || c1.lat === null || c1.lon === null) {
+          const brgRad = (c1.bearingDeg * Math.PI) / 180;
+          const rayLenPx = 11 * pxPerNm;
+          ctx.save();
+          ctx.setLineDash([6, 5]);
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(cx, cy);
+          ctx.lineTo(cx + Math.sin(brgRad) * rayLenPx, cy - Math.cos(brgRad) * rayLenPx);
+          ctx.stroke();
+          ctx.restore();
+
+          const lx = cx + Math.sin(brgRad) * (7.2 * pxPerNm);
+          const ly = cy - Math.cos(brgRad) * (7.2 * pxPerNm);
+          ctx.font = '10px Courier New';
+          ctx.fillText(`${c1.id} BRG ${c1.bearingDeg.toFixed(0)}° (${c1.snrDb.toFixed(0)}dB)`, lx + 4, ly);
+          continue;
+        }
+
         const c0 = this.prevSnapshot
-          ? (this.prevSnapshot.contacts || []).find((c) => c.id === c1.id) || c1
+          ? (this.prevSnapshot.contacts || []).find((c) => c.id === c1.id && c.ranged && c.lat !== null) || c1
           : c1;
         const cLat = lerp(c0.lat, c1.lat, alpha);
         const cLon = lerp(c0.lon, c1.lon, alpha);
-        const cHdg = lerpAngleDeg(c0.headingDeg, c1.headingDeg, alpha);
+        const cHdg = lerpAngleDeg(c0.headingDeg ?? c1.headingDeg ?? 0, c1.headingDeg ?? 0, alpha);
 
         const dxNm = (cLon - subLon) * 60 * cosLat;
         const dyNm = (cLat - subLat) * 60;
         const px = cx + dxNm * pxPerNm;
         const py = cy - dyNm * pxPerNm;
 
-        const color = c1.allegiance === 'HOSTILE' ? '#ff3b3b' : '#00ff66';
-        ctx.strokeStyle = color;
-        ctx.fillStyle = color;
         ctx.lineWidth = 1.5;
-
-        // Contact symbol + heading vector
         ctx.strokeRect(px - 5, py - 5, 10, 10);
         const rad = (cHdg * Math.PI) / 180;
         ctx.beginPath();
@@ -107,6 +125,33 @@
 
         ctx.font = '10px Courier New';
         ctx.fillText(`${c1.id} (${c1.rangeNm.toFixed(1)}NM)`, px + 8, py - 4);
+      }
+
+      // Draw active MK-48 ADCAP torpedoes
+      for (const w1 of this.currSnapshot.weapons || []) {
+        const w0 = this.prevSnapshot
+          ? (this.prevSnapshot.weapons || []).find((w) => w.id === w1.id) || w1
+          : w1;
+        const wLat = lerp(w0.lat, w1.lat, alpha);
+        const wLon = lerp(w0.lon, w1.lon, alpha);
+        const dxNm = (wLon - subLon) * 60 * cosLat;
+        const dyNm = (wLat - subLat) * 60;
+        const px = cx + dxNm * pxPerNm;
+        const py = cy - dyNm * pxPerNm;
+        const rad = (w1.headingDeg * Math.PI) / 180;
+
+        ctx.strokeStyle = '#00ff66';
+        ctx.fillStyle = '#00ff66';
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.arc(px, py, 3, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.moveTo(px, py);
+        ctx.lineTo(px + Math.sin(rad) * 14, py - Math.cos(rad) * 14);
+        ctx.stroke();
+        ctx.font = '10px Courier New';
+        ctx.fillText(w1.id, px + 6, py + 3);
       }
 
       // Draw own submarine at center

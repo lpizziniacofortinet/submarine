@@ -30,6 +30,7 @@
     document.getElementById('sub-hdg').textContent = `${sub.headingDeg.toFixed(1)}° / ${sub.orderedHeadingDeg.toFixed(0)}°`;
     document.getElementById('sub-spd').textContent = `${sub.speedKts.toFixed(1)} / ${sub.orderedSpeedKts.toFixed(1)} KT`;
     document.getElementById('sub-dep').textContent = `${sub.depthM.toFixed(1)} / ${sub.orderedDepthM.toFixed(0)} m`;
+    document.getElementById('sub-torps').textContent = `${sub.torpedoesRemaining} READY`;
 
     const env = snap.environment;
     document.getElementById('val-env').textContent =
@@ -48,7 +49,8 @@
       for (const c of contacts) {
         const li = document.createElement('li');
         li.className = c.allegiance === 'HOSTILE' ? 'hostile' : 'neutral';
-        li.textContent = `${c.id} | ${c.designation} | BRG ${c.bearingDeg.toFixed(0)}° | ${c.rangeNm.toFixed(1)} NM | ${c.speedKts.toFixed(0)} KT`;
+        const rangeText = c.ranged && c.rangeNm !== null ? `${c.rangeNm.toFixed(1)} NM` : 'PASSIVE BRG ONLY';
+        li.textContent = `${c.id} | ${c.designation} | BRG ${c.bearingDeg.toFixed(0)}° | ${rangeText} | SNR +${c.snrDb.toFixed(1)} dB`;
         listEl.appendChild(li);
       }
     }
@@ -71,9 +73,10 @@
     onMessage(msg) {
       if (msg.type === 'WELCOME') {
         snapshotHz = msg.payload.snapshotHz || 10;
+        document.getElementById('val-role').textContent = msg.payload.assignedRole || 'COMMANDER';
         document.getElementById('val-session-id').textContent = msg.payload.sessionId.slice(0, 8);
         logEvent(
-          `${msg.payload.reconnected ? 'Reconnected' : 'Connected'} to ${msg.payload.worldId} (${msg.payload.simHz}Hz sim / ${snapshotHz}Hz snap)`,
+          `${msg.payload.reconnected ? 'Reconnected' : 'Connected'} as ${msg.payload.assignedRole} to ${msg.payload.worldId} (${msg.payload.simHz}Hz sim / ${snapshotHz}Hz snap)`,
           'ok'
         );
       } else if (msg.type === 'WORLD_SNAPSHOT') {
@@ -93,7 +96,11 @@
   });
 
   document.getElementById('btn-connect').addEventListener('click', () => {
-    net.connect(wsInput.value.trim(), document.getElementById('input-callsign').value.trim());
+    net.connect(
+      wsInput.value.trim(),
+      document.getElementById('input-callsign').value.trim(),
+      document.getElementById('select-role').value
+    );
   });
   document.getElementById('btn-disconnect').addEventListener('click', () => net.disconnect());
 
@@ -105,6 +112,12 @@
   });
   document.getElementById('btn-set-depth').addEventListener('click', () => {
     net.sendCommand('SET_DEPTH', Number(document.getElementById('order-depth').value));
+  });
+  document.getElementById('btn-fire-torp').addEventListener('click', () => {
+    net.sendCommand('FIRE_TUBE', Number(document.getElementById('order-torp-brg').value));
+  });
+  document.getElementById('btn-active-ping').addEventListener('click', () => {
+    net.sendCommand('ACTIVE_PING', 1);
   });
 
   function renderLoop() {

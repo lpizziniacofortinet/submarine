@@ -3,13 +3,14 @@
 
   const PROTOCOL_VERSION = 1;
 
-  function buildHello(clientName, sessionId = null) {
+  function buildHello(clientName, sessionId = null, role = 'COMMANDER') {
     return JSON.stringify({
       type: 'HELLO',
       version: PROTOCOL_VERSION,
       payload: {
         clientName: clientName || 'web-tactical-client',
-        sessionId: sessionId || null
+        sessionId: sessionId || null,
+        role: role || 'COMMANDER'
       }
     });
   }

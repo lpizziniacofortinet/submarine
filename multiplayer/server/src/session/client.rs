@@ -2,10 +2,51 @@ use std::collections::HashMap;
 use std::time::{Duration, Instant};
 use uuid::Uuid;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum WatchRole {
+    Commander,
+    Conn,
+    Sonar,
+    Weps,
+}
+
+impl WatchRole {
+    pub fn from_str_or_default(raw: Option<&str>) -> Self {
+        match raw.unwrap_or("COMMANDER").trim().to_ascii_uppercase().as_str() {
+            "CONN" => Self::Conn,
+            "SONAR" => Self::Sonar,
+            "WEPS" => Self::Weps,
+            _ => Self::Commander,
+        }
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Commander => "COMMANDER",
+            Self::Conn => "CONN",
+            Self::Sonar => "SONAR",
+            Self::Weps => "WEPS",
+        }
+    }
+
+    pub fn can_helm(&self) -> bool {
+        matches!(self, Self::Commander | Self::Conn)
+    }
+
+    pub fn can_sonar(&self) -> bool {
+        matches!(self, Self::Commander | Self::Sonar)
+    }
+
+    pub fn can_weapons(&self) -> bool {
+        matches!(self, Self::Commander | Self::Weps)
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct ClientSession {
     pub session_id: String,
     pub client_name: String,
+    pub role: WatchRole,
     pub controlled_entity_id: String,
     pub can_command_own_sub: bool,
     pub connected: bool,
@@ -27,6 +68,7 @@ impl SessionManager {
         &mut self,
         client_name: String,
         requested_session_id: Option<String>,
+        requested_role: Option<String>,
     ) -> (ClientSession, bool) {
         let now = Instant::now();
         if let Some(req_id) = requested_session_id {
@@ -36,11 +78,15 @@ impl SessionManager {
                 if !client_name.trim().is_empty() {
                     existing.client_name = client_name;
                 }
+                if requested_role.is_some() {
+                    existing.role = WatchRole::from_str_or_default(requested_role.as_deref());
+                }
                 return (existing.clone(), true);
             }
         }
 
         let session_id = Uuid::new_v4().to_string();
+        let role = WatchRole::from_str_or_default(requested_role.as_deref());
         let session = ClientSession {
             session_id: session_id.clone(),
             client_name: if client_name.trim().is_empty() {
@@ -48,6 +94,7 @@ impl SessionManager {
             } else {
                 client_name
             },
+            role,
             controlled_entity_id: "SSN-774".to_string(),
             can_command_own_sub: true,
             connected: true,
@@ -92,7 +139,6 @@ impl SessionManager {
                 timed_out += 1;
             }
         }
-        // Keep disconnected sessions around for 5 minutes to allow reconnection
         let reconnect_ttl = Duration::from_secs(300);
         self.sessions
             .retain(|_, s| s.connected || now.duration_since(s.last_seen) <= reconnect_ttl);

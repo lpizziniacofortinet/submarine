@@ -14,7 +14,8 @@
           "required": ["clientName"],
           "properties": {
             "clientName": { "type": "string", "minLength": 1, "maxLength": 64 },
-            "sessionId": { "type": ["string", "null"] }
+            "sessionId": { "type": ["string", "null"] },
+            "role": { "enum": ["COMMANDER", "CONN", "SONAR", "WEPS"] }
           }
         }
       }
@@ -45,7 +46,7 @@
           "type": "object",
           "required": ["command", "value"],
           "properties": {
-            "command": { "enum": ["SET_HEADING", "SET_SPEED", "SET_DEPTH"] },
+            "command": { "enum": ["SET_HEADING", "SET_SPEED", "SET_DEPTH", "ACTIVE_PING", "FIRE_TUBE"] },
             "value": { "type": "number" }
           }
         }

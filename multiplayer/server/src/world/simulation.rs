@@ -74,13 +74,20 @@ pub fn spawn_simulation_loops(runtime: Arc<SimulationRuntime>) {
             accumulator += clamped;
 
             let mut steps = 0u32;
+            let mut drained_events = Vec::new();
             while accumulator >= fixed_dt && steps < 4 {
                 {
                     let mut world = sim_runtime.world.lock().await;
                     world.step(fixed_dt_sec);
+                    if !world.pending_events.is_empty() {
+                        drained_events.append(&mut world.pending_events);
+                    }
                 }
                 accumulator -= fixed_dt;
                 steps += 1;
+            }
+            for evt in drained_events {
+                let _ = sim_runtime.event_tx.send(evt);
             }
             if accumulator >= fixed_dt {
                 accumulator = Duration::ZERO;
