@@ -80,6 +80,40 @@
     document.getElementById('env-towed').textContent = sub.towedArrayDeployed ? 'STREAMED (22 KT CAP)' : 'RETRACTED';
     document.getElementById('svp-layer-label').textContent = `LAYER ${env.thermoclineM}m`;
 
+    // Periscope telemetry is limited to values present in the authoritative snapshot.
+    document.getElementById('periscope-heading').textContent = `${Math.round(sub.headingDeg).toString().padStart(3, '0')}°`;
+    document.getElementById('periscope-depth').textContent = `${sub.depthM.toFixed(0)} M`;
+    document.getElementById('periscope-sea-state').textContent = `SS-${env.seaState}`;
+    document.getElementById('periscope-azimuth').textContent = `${Math.round(sub.headingDeg).toString().padStart(3, '0')}°`;
+    document.getElementById('periscope-weather').textContent = `WIND ${Math.round(env.windSpeedKts)} KT`;
+    const surfaceTracks = contacts.filter((c) =>
+      c.ranged && c.rangeNm !== null && c.rangeNm !== undefined &&
+      c.depthM !== null && c.depthM !== undefined && c.depthM <= 2.0 &&
+      ['MERCHANT', 'WARSHIP', 'SURFACE'].includes(String(c.category).toUpperCase())
+    );
+    document.getElementById('periscope-track-count').textContent = surfaceTracks.length;
+    const trackList = document.getElementById('periscope-track-list');
+    trackList.replaceChildren();
+    if (surfaceTracks.length === 0) {
+      const empty = document.createElement('div');
+      empty.className = 'muted';
+      empty.textContent = 'No server-ranged surface tracks.';
+      trackList.appendChild(empty);
+    } else {
+      for (const track of surfaceTracks) {
+        const row = document.createElement('div');
+        row.className = 'periscope-track';
+        const name = document.createElement('strong');
+        name.textContent = track.id;
+        const range = document.createElement('span');
+        range.textContent = `${track.rangeNm.toFixed(1)} NM · BRG ${track.bearingDeg.toFixed(0)}°`;
+        const detail = document.createElement('small');
+        detail.textContent = `${track.designation} · SERVER-RANGED TRACK CUE`;
+        row.append(name, range, detail);
+        trackList.appendChild(row);
+      }
+    }
+
     const arrBtn = document.getElementById('btn-toggle-array');
     arrBtn.classList.toggle('active', sub.towedArrayDeployed);
     arrBtn.textContent = `TB-29A ARRAY: ${sub.towedArrayDeployed ? 'DEPLOYED' : 'RETRACTED'}`;
@@ -232,6 +266,15 @@
     if (sel) document.getElementById('order-torp-brg').value = Math.round(sel.bearingDeg);
   });
 
+  document.getElementById('btn-periscope-zoom-in').addEventListener('click', () => {
+    renderer.setPeriscopeZoom(1);
+    renderer.renderActiveStation(activeStation, selectedContactId);
+  });
+  document.getElementById('btn-periscope-zoom-out').addEventListener('click', () => {
+    renderer.setPeriscopeZoom(-1);
+    renderer.renderActiveStation(activeStation, selectedContactId);
+  });
+
   document.getElementById('btn-sonar-clear-track').addEventListener('click', () => {
     selectedContactId = null;
     if (lastSnapshot) updateUI(lastSnapshot);
@@ -272,6 +315,7 @@
     if (e.key === 'F3') { e.preventDefault(); switchStation('weapons'); }
     if (e.key === 'F4') { e.preventDefault(); switchStation('maneuvering'); }
     if (e.key === 'F5') { e.preventDefault(); switchStation('damage'); }
+    if (e.key === 'F6') { e.preventDefault(); switchStation('periscope'); }
   });
 
   let lastFrameMs = performance.now();
