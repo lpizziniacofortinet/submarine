@@ -5,70 +5,130 @@
   const wsInput = document.getElementById('input-ws-url');
   wsInput.value = defaultWs;
 
-  const renderer = new window.TacticalCanvasRenderer('tactical-canvas');
-  const waterfall = new window.SonarWaterfallRenderer('sonar-waterfall-canvas');
+  const renderer = new window.MultiStationRenderer();
+  let activeStation = 'tactical';
+  let selectedContactId = null;
+  let lastSnapshot = null;
   let snapshotHz = 10;
 
   function logEvent(text, level = 'info') {
     const logEl = document.getElementById('event-log');
     const row = document.createElement('div');
     const ts = new Date().toLocaleTimeString();
-    row.style.color = level === 'err' ? 'var(--red)' : level === 'ok' ? 'var(--green)' : 'var(--cyan)';
+    row.style.color = level === 'err' ? 'var(--crt-red)' : level === 'ok' ? 'var(--crt-green)' : 'var(--crt-cyan)';
     row.textContent = `[${ts}] ${text}`;
     logEl.prepend(row);
-    while (logEl.children.length > 50) logEl.removeChild(logEl.lastChild);
+    while (logEl.children.length > 60) logEl.removeChild(logEl.lastChild);
   }
 
-  function updateSnapshotUI(snap) {
+  function switchStation(station) {
+    activeStation = station;
+    document.querySelectorAll('.station-tab').forEach((btn) => {
+      btn.classList.toggle('active', btn.dataset.station === station);
+    });
+    document.querySelectorAll('.station-screen').forEach((scr) => {
+      scr.classList.toggle('active', scr.id === `screen-${station}`);
+    });
+    if (station === 'tactical' && renderer.leafletMap) {
+      setTimeout(() => renderer.leafletMap.invalidateSize(), 40);
+    }
+    renderer.renderActiveStation(activeStation, selectedContactId);
+  }
+
+  function updateUI(snap) {
+    lastSnapshot = snap;
+    const sub = snap.ownSub;
+    const env = snap.environment;
+
     document.getElementById('val-world-id').textContent = snap.worldId;
-    document.getElementById('val-tick').textContent = snap.serverTick;
-    document.getElementById('val-sim-time').textContent = `${snap.simTimeSec.toFixed(1)} s`;
-    document.getElementById('val-snap-seq').textContent = snap.snapshotSeq;
+    document.getElementById('dmg-world').textContent = snap.worldId;
+    document.getElementById('hud-hdg').textContent = `${Math.round(sub.headingDeg).toString().padStart(3, '0')}°`;
+    document.getElementById('hud-spd').textContent = `${sub.speedKts.toFixed(1)} KT`;
+    document.getElementById('hud-dep').textContent = `${sub.depthM.toFixed(0)} m`;
+    document.getElementById('hud-seabed').textContent = `${env.waterDepthM.toFixed(0)} m`;
+    document.getElementById('hud-hull').textContent = `${sub.hullIntegrityPct.toFixed(0)}%`;
+    document.getElementById('dmg-hull').textContent = `${sub.hullIntegrityPct.toFixed(0)}%`;
+    document.getElementById('hud-sim-time').textContent = `${snap.simTimeSec.toFixed(1)} s`;
+    document.getElementById('val-snap-seq').textContent = `SEQ ${snap.snapshotSeq}`;
     document.getElementById('val-last-snap').textContent = new Date().toLocaleTimeString();
 
-    const sub = snap.ownSub;
-    document.getElementById('sub-pos').textContent = `${sub.lat.toFixed(4)}°N, ${sub.lon.toFixed(4)}°E`;
-    document.getElementById('sub-hdg').textContent = `${sub.headingDeg.toFixed(1)}° / ${sub.orderedHeadingDeg.toFixed(0)}°`;
-    document.getElementById('sub-spd').textContent = `${sub.speedKts.toFixed(1)} / ${sub.orderedSpeedKts.toFixed(1)} KT`;
-    document.getElementById('sub-dep').textContent = `${sub.depthM.toFixed(1)} / ${sub.orderedDepthM.toFixed(0)} m`;
-    document.getElementById('sub-hull').textContent = `${sub.hullIntegrityPct.toFixed(0)}%`;
-    document.getElementById('sub-torps').textContent = `${sub.torpedoesRemaining} TORP / ${sub.decoysRemaining} ADC`;
-    document.getElementById('val-towed').textContent = `TOWED ARRAY: ${sub.towedArrayDeployed ? 'DEPLOYED' : 'RETRACTED'}`;
+    document.getElementById('sub-pos').textContent = `${sub.lat.toFixed(4)}°N ${sub.lon.toFixed(4)}°E`;
+    document.getElementById('sub-torps').textContent = `${sub.torpedoesRemaining} / ${sub.decoysRemaining}`;
+    document.getElementById('weps-torp-count').textContent = sub.torpedoesRemaining;
+    document.getElementById('weps-decoy-count').textContent = sub.decoysRemaining;
 
-    const env = snap.environment;
-    document.getElementById('val-env').textContent =
-      `SEA STATE ${env.seaState} | LAYER ${env.thermoclineM}m | SEABED ${env.waterDepthM}m`;
+    const cav = Math.abs(sub.speedKts) > 16 && sub.depthM < 80;
+    const hostileTorp = (snap.weapons || []).some((w) => w.ownerId !== sub.id);
+    document.getElementById('ann-cavitating').className = `annunciator ${cav ? 'crit-active' : ''}`;
+    document.getElementById('ann-thermocline').className = `annunciator ${sub.depthM > env.thermoclineM ? 'warn-active' : ''}`;
+    document.getElementById('ann-ping').className = `annunciator ${sub.activePingCooldownSec > 5 ? 'warn-active' : ''}`;
+    document.getElementById('ann-torpedo').className = `annunciator ${hostileTorp ? 'crit-active' : ''}`;
+    document.getElementById('ann-hull').className = `annunciator ${sub.hullIntegrityPct <= 50 ? 'crit-active' : ''}`;
 
-    const listEl = document.getElementById('contacts-list');
+    const cavLbl = document.getElementById('sidebar-cav-warn');
+    cavLbl.textContent = cav ? 'CAVITATING!' : 'QUIET';
+    cavLbl.style.color = cav ? 'var(--crt-red)' : 'var(--crt-green)';
+
+    document.getElementById('val-env').textContent = `SEA ${env.seaState} | LAYER ${env.thermoclineM}m | SEABED ${env.waterDepthM}m`;
+    document.getElementById('env-sea-state').textContent = `SS-${env.seaState}`;
+    document.getElementById('env-wind').textContent = `${env.windSpeedKts} KT @ ${env.windDirDeg}°`;
+    document.getElementById('env-layer').textContent = `${env.thermoclineM} m`;
+    document.getElementById('env-seabed').textContent = `${env.waterDepthM} m`;
+    document.getElementById('env-clearance').textContent = `${Math.max(0, Math.round(env.waterDepthM - sub.depthM))} m`;
+    document.getElementById('env-towed').textContent = sub.towedArrayDeployed ? 'STREAMED (22 KT CAP)' : 'RETRACTED';
+    document.getElementById('svp-layer-label').textContent = `LAYER ${env.thermoclineM}m`;
+
+    const arrBtn = document.getElementById('btn-toggle-array');
+    arrBtn.classList.toggle('active', sub.towedArrayDeployed);
+    arrBtn.textContent = `TB-29A ARRAY: ${sub.towedArrayDeployed ? 'DEPLOYED' : 'RETRACTED'}`;
+
     const contacts = snap.contacts || [];
     document.getElementById('contact-count').textContent = contacts.length;
-    listEl.innerHTML = '';
+    const tbody = document.getElementById('contacts-table-body');
+    tbody.innerHTML = '';
     if (contacts.length === 0) {
-      const li = document.createElement('li');
-      li.className = 'muted';
-      li.textContent = 'No client-visible contacts.';
-      listEl.appendChild(li);
+      tbody.innerHTML = '<tr><td colspan="4" class="muted">No tracks detected.</td></tr>';
     } else {
       for (const c of contacts) {
-        const li = document.createElement('li');
-        li.className = c.allegiance === 'HOSTILE' ? 'hostile' : 'neutral';
-        const rangeText = c.ranged && c.rangeNm !== null ? `${c.rangeNm.toFixed(1)} NM` : `PASSIVE (TMA ${c.tmaQualityPct}%)`;
-        li.textContent = `${c.id} | ${c.designation} | BRG ${c.bearingDeg.toFixed(0)}° | ${rangeText} | SNR +${c.snrDb.toFixed(1)} dB`;
-        listEl.appendChild(li);
+        const tr = document.createElement('tr');
+        if (c.id === selectedContactId) tr.className = 'selected';
+        const rngTxt = c.ranged && c.rangeNm !== null ? `${c.rangeNm.toFixed(1)}NM` : `TMA ${c.tmaQualityPct}%`;
+        tr.innerHTML = `<td>${c.id}</td><td>${c.category}</td><td>${c.bearingDeg.toFixed(0)}°</td><td>${rngTxt}</td>`;
+        tr.addEventListener('click', () => {
+          selectedContactId = selectedContactId === c.id ? null : c.id;
+          updateUI(snap);
+        });
+        tbody.appendChild(tr);
       }
     }
+
+    const sel = contacts.find((c) => c.id === selectedContactId) || null;
+    document.getElementById('sonar-spectrum-target').textContent = sel ? `ANALYZING ${sel.id}` : 'NO TRACK SELECTED';
+    document.getElementById('tma-track-id').textContent = sel ? sel.id : '--';
+    document.getElementById('tma-desig').textContent = sel ? sel.designation : '--';
+    document.getElementById('tma-brg').textContent = sel ? `${sel.bearingDeg.toFixed(1)}°` : '--';
+    document.getElementById('tma-snr').textContent = sel ? `+${sel.snrDb.toFixed(1)} dB` : '--';
+    document.getElementById('tma-quality').textContent = sel ? `${sel.tmaQualityPct}%` : '--';
+    document.getElementById('tma-range').textContent = sel && sel.ranged && sel.rangeNm !== null ? `${sel.rangeNm.toFixed(2)} NM` : 'PASSIVE BRG ONLY';
+    document.getElementById('tma-crs-spd').textContent = sel && sel.ranged ? `${Math.round(sel.headingDeg)}° / ${sel.speedKts.toFixed(0)} KT` : '-- / --';
+    document.getElementById('fc-selected-target').textContent = sel ? `${sel.id} (${sel.bearingDeg.toFixed(0)}°)` : 'NO TARGET';
   }
+
+  let latestTick = 0;
+  let latestRtt = '--';
 
   const net = new window.TacticalNetworkClient({
     onStatusChange(status) {
       const pill = document.getElementById('conn-pill');
-      pill.textContent = status;
+      pill.textContent = status === 'CONNECTED' ? 'ONLINE' : status;
       pill.className = `pill ${status === 'CONNECTED' ? 'online' : status === 'CONNECTING' ? 'connecting' : 'offline'}`;
       document.getElementById('btn-connect').disabled = status !== 'DISCONNECTED';
       document.getElementById('btn-disconnect').disabled = status === 'DISCONNECTED';
     },
     onLatency(rttMs) {
-      document.getElementById('val-latency').textContent = `${Math.round(rttMs)} ms`;
+      latestRtt = `${Math.round(rttMs)}`;
+      document.getElementById('val-latency').textContent = `${latestRtt} ms`;
+      document.getElementById('hud-tick-rtt').textContent = `${latestTick} / ${latestRtt} ms`;
     },
     onError(errMsg) {
       logEvent(`ERROR: ${errMsg}`, 'err');
@@ -76,27 +136,38 @@
     onMessage(msg) {
       if (msg.type === 'WELCOME') {
         snapshotHz = msg.payload.snapshotHz || 10;
-        document.getElementById('val-role').textContent = msg.payload.assignedRole || 'COMMANDER';
-        document.getElementById('val-session-id').textContent = msg.payload.sessionId.slice(0, 8);
-        logEvent(
-          `${msg.payload.reconnected ? 'Reconnected' : 'Connected'} as ${msg.payload.assignedRole} to ${msg.payload.worldId} (${msg.payload.simHz}Hz sim / ${snapshotHz}Hz snap)`,
-          'ok'
-        );
+        document.getElementById('hud-vessel').textContent = `${msg.payload.vesselId} (${msg.payload.assignedRole})`;
+        document.getElementById('val-session-id').textContent = msg.payload.sessionId;
+        logEvent(`${msg.payload.reconnected ? 'Reconnected' : 'Connected'} ${msg.payload.vesselId} [${msg.payload.assignedRole}] @ ${msg.payload.worldId}`, 'ok');
       } else if (msg.type === 'WORLD_SNAPSHOT') {
+        latestTick = msg.payload.serverTick;
+        document.getElementById('hud-tick-rtt').textContent = `${latestTick} / ${latestRtt} ms`;
         renderer.pushSnapshot(msg.payload, snapshotHz);
-        waterfall.step(msg.payload);
-        updateSnapshotUI(msg.payload);
+        updateUI(msg.payload);
       } else if (msg.type === 'WORLD_EVENT') {
-        logEvent(`[${msg.payload.category}] ${msg.payload.message}`, 'info');
+        logEvent(`[${msg.payload.category}] ${msg.payload.message}`, msg.payload.category === 'ALERT' ? 'err' : 'info');
+        if (msg.payload.message.includes('TORPEDO IN THE WATER')) window.MultiplayerAudio.playTorpedoAlert();
       } else if (msg.type === 'COMMAND_RESULT') {
         const ack = document.getElementById('cmd-ack');
-        ack.textContent = `#${msg.sequence} ${msg.payload.accepted ? 'ACCEPTED' : 'REJECTED'}: ${msg.payload.message}`;
+        ack.textContent = `#${msg.sequence} ${msg.payload.accepted ? 'ACK' : 'REJ'}: ${msg.payload.message}`;
         ack.className = `cmd-ack ${msg.payload.accepted ? '' : 'err'}`;
-        logEvent(ack.textContent, msg.payload.accepted ? 'ok' : 'err');
+        window.MultiplayerAudio.playBeep(msg.payload.accepted ? 960 : 320, 0.05);
       } else if (msg.type === 'ERROR') {
         logEvent(`SERVER ERROR [${msg.payload.code}]: ${msg.payload.message}`, 'err');
       }
     }
+  });
+
+  renderer.initLeafletMap();
+
+  document.querySelectorAll('.station-tab').forEach((btn) => {
+    btn.addEventListener('click', () => switchStation(btn.dataset.station));
+  });
+
+  document.getElementById('btn-audio-toggle').addEventListener('click', (e) => {
+    const on = window.MultiplayerAudio.toggle();
+    e.target.textContent = `AUDIO: ${on ? 'ON' : 'OFF'}`;
+    e.target.classList.toggle('active', on);
   });
 
   document.getElementById('btn-connect').addEventListener('click', () => {
@@ -110,31 +181,32 @@
   });
   document.getElementById('btn-disconnect').addEventListener('click', () => net.disconnect());
 
-  document.getElementById('btn-set-heading').addEventListener('click', () => {
-    net.sendCommand('SET_HEADING', Number(document.getElementById('order-heading').value));
-  });
-  document.getElementById('btn-set-speed').addEventListener('click', () => {
-    net.sendCommand('SET_SPEED', Number(document.getElementById('order-speed').value));
-  });
-  document.getElementById('btn-set-depth').addEventListener('click', () => {
-    net.sendCommand('SET_DEPTH', Number(document.getElementById('order-depth').value));
-  });
-  document.getElementById('btn-fire-torp').addEventListener('click', () => {
-    net.sendCommand('FIRE_TUBE', Number(document.getElementById('order-torp-brg').value));
-  });
+  document.getElementById('btn-set-heading').addEventListener('click', () => net.sendCommand('SET_HEADING', Number(document.getElementById('order-heading').value)));
+  document.getElementById('btn-set-speed').addEventListener('click', () => net.sendCommand('SET_SPEED', Number(document.getElementById('order-speed').value)));
+  document.getElementById('btn-set-depth').addEventListener('click', () => net.sendCommand('SET_DEPTH', Number(document.getElementById('order-depth').value)));
   document.getElementById('btn-active-ping').addEventListener('click', () => {
-    net.sendCommand('ACTIVE_PING', 1);
+    if (net.sendCommand('ACTIVE_PING', 1)) window.MultiplayerAudio.playActivePing();
   });
-  document.getElementById('btn-toggle-array').addEventListener('click', () => {
-    net.sendCommand('TOGGLE_TOWED_ARRAY', 1);
-  });
-  document.getElementById('btn-deploy-decoy').addEventListener('click', () => {
-    net.sendCommand('DEPLOY_DECOY', 1);
+  document.getElementById('btn-toggle-array').addEventListener('click', () => net.sendCommand('TOGGLE_TOWED_ARRAY', 1));
+  document.getElementById('btn-deploy-decoy').addEventListener('click', () => net.sendCommand('DEPLOY_DECOY', 1));
+  document.getElementById('btn-fire-torp').addEventListener('click', () => net.sendCommand('FIRE_TUBE', Number(document.getElementById('order-torp-brg').value)));
+  document.getElementById('btn-sync-torp-brg').addEventListener('click', () => {
+    if (!lastSnapshot) return;
+    const sel = (lastSnapshot.contacts || []).find((c) => c.id === selectedContactId);
+    if (sel) document.getElementById('order-torp-brg').value = Math.round(sel.bearingDeg);
   });
 
-  function renderLoop() {
-    renderer.render();
-    requestAnimationFrame(renderLoop);
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'F1') { e.preventDefault(); switchStation('tactical'); }
+    if (e.key === 'F2') { e.preventDefault(); switchStation('sonar'); }
+    if (e.key === 'F3') { e.preventDefault(); switchStation('weapons'); }
+    if (e.key === 'F4') { e.preventDefault(); switchStation('maneuvering'); }
+    if (e.key === 'F5') { e.preventDefault(); switchStation('damage'); }
+  });
+
+  function loop() {
+    renderer.renderActiveStation(activeStation, selectedContactId);
+    requestAnimationFrame(loop);
   }
-  requestAnimationFrame(renderLoop);
+  requestAnimationFrame(loop);
 })();

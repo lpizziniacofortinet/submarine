@@ -3,136 +3,248 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>SSN-774 // Authoritative Multiplayer Tactical Client</title>
+  <title>SSN-774 VIRGINIA CLASS // MULTIPLAYER AN/BYG-1 COMBAT CONTROL</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
   <link rel="stylesheet" href="css/client.css" />
 </head>
-<body>
-  <div class="shell">
-    <header class="topbar">
-      <div class="brand">
-        <span class="badge">NET-CLIENT v1</span>
-        <h1>SSN-774 AUTHORITATIVE TACTICAL CONSOLE</h1>
+<body class="crt-effect">
+  <div id="app-container">
+    <!-- TOP STATION MENU + MULTIPLAYER CONNECTION BAR -->
+    <nav id="station-nav">
+      <div id="station-primary-row">
+        <button class="station-tab active" data-station="tactical">[F1] GEO / TACTICAL PLOT</button>
+        <button class="station-tab" data-station="sonar">[F2] SONAR &amp; TMA</button>
+        <button class="station-tab" data-station="weapons">[F3] FIRE CONTROL</button>
+        <button class="station-tab" data-station="maneuvering">[F4] MANEUVERING / SVP</button>
+        <button class="station-tab" data-station="damage">[F5] HULL &amp; DISPATCH</button>
       </div>
-      <div class="conn-bar">
-        <label>SERVER WS:
-          <input id="input-ws-url" type="text" value="" />
-        </label>
-        <label>CALLSIGN:
-          <input id="input-callsign" type="text" value="CONN-ALPHA" maxlength="32" />
-        </label>
-        <label>ROOM:
-          <input id="input-room-id" type="text" value="med-patrol-alpha" maxlength="32" />
-        </label>
-        <label>VESSEL:
-          <select id="select-vessel">
-            <option value="SSN-774">USS VIRGINIA (SSN-774)</option>
-            <option value="OPFOR-SUB">K-561 KAZAN (OPFOR)</option>
-          </select>
-        </label>
-        <label>ROLE:
-          <select id="select-role">
-            <option value="COMMANDER">COMMANDER</option>
-            <option value="CONN">CONN (HELM)</option>
-            <option value="SONAR">SONAR</option>
-            <option value="WEPS">WEPS</option>
-          </select>
-        </label>
-        <button id="btn-connect" class="btn primary">CONNECT</button>
-        <button id="btn-disconnect" class="btn" disabled>DISCONNECT</button>
-        <span id="conn-pill" class="pill offline">DISCONNECTED</span>
+      <div id="station-tools-row">
+        <input id="input-ws-url" type="text" title="WebSocket Server URL" style="width:190px;" />
+        <input id="input-callsign" type="text" value="CONN-ALPHA" maxlength="24" title="Operator Callsign" style="width:95px;" />
+        <input id="input-room-id" type="text" value="med-patrol-alpha" maxlength="28" title="Match Room ID" style="width:125px;" />
+        <select id="select-vessel" class="mil-select" title="Submarine Vessel">
+          <option value="SSN-774">SSN-774</option>
+          <option value="OPFOR-SUB">OPFOR-SUB</option>
+        </select>
+        <select id="select-role" class="mil-select" title="Watchstation Role">
+          <option value="COMMANDER">COMMANDER</option>
+          <option value="CONN">CONN</option>
+          <option value="SONAR">SONAR</option>
+          <option value="WEPS">WEPS</option>
+        </select>
+        <button id="btn-connect" class="mil-btn cyan">CONNECT</button>
+        <button id="btn-disconnect" class="mil-btn" disabled>DISCONNECT</button>
+        <button id="btn-audio-toggle" class="mil-btn">AUDIO: OFF</button>
+        <span id="conn-pill" class="pill offline">OFFLINE</span>
+      </div>
+    </nav>
+
+    <!-- TOP MASTER TELEMETRY HUD + ANNUNCIATORS -->
+    <header id="top-hud">
+      <div class="hud-group">
+        <div class="hud-cell"><span class="hud-label">VESSEL / ROLE</span><span class="hud-val cyan" id="hud-vessel">--</span></div>
+        <div class="hud-cell"><span class="hud-label">COURSE</span><span class="hud-val" id="hud-hdg">---°</span></div>
+        <div class="hud-cell"><span class="hud-label">SPEED</span><span class="hud-val" id="hud-spd">-- KT</span></div>
+        <div class="hud-cell"><span class="hud-label">DEPTH</span><span class="hud-val cyan" id="hud-dep">-- m</span></div>
+        <div class="hud-cell"><span class="hud-label">SEABED</span><span class="hud-val" id="hud-seabed">-- m</span></div>
+        <div class="hud-cell"><span class="hud-label">HULL</span><span class="hud-val" id="hud-hull">100%</span></div>
+        <div class="hud-cell"><span class="hud-label">TICK / RTT</span><span class="hud-val amber" id="hud-tick-rtt">0 / -- ms</span></div>
+        <div class="hud-cell"><span class="hud-label">SIM TIME</span><span class="hud-val" id="hud-sim-time">0.0 s</span></div>
+      </div>
+
+      <div id="annunciator-strip">
+        <div class="annunciator" id="ann-cavitating">CAVITATING</div>
+        <div class="annunciator" id="ann-thermocline">BELOW LAYER</div>
+        <div class="annunciator" id="ann-ping">ACTIVE PING</div>
+        <div class="annunciator" id="ann-torpedo">TORPEDO IN WATER</div>
+        <div class="annunciator" id="ann-hull">HULL CRITICAL</div>
       </div>
     </header>
 
-    <section class="telemetry-strip">
-      <div><span>WORLD:</span> <strong id="val-world-id">--</strong></div>
-      <div><span>ROLE:</span> <strong id="val-role">--</strong></div>
-      <div><span>SESSION:</span> <strong id="val-session-id">--</strong></div>
-      <div><span>SERVER TICK:</span> <strong id="val-tick">0</strong></div>
-      <div><span>SIM TIME:</span> <strong id="val-sim-time">0.0 s</strong></div>
-      <div><span>SNAPSHOT SEQ:</span> <strong id="val-snap-seq">0</strong></div>
-      <div><span>LAST SNAPSHOT:</span> <strong id="val-last-snap">--</strong></div>
-      <div><span>RTT LATENCY:</span> <strong id="val-latency">-- ms</strong></div>
-    </section>
-
-    <main class="grid">
-      <section class="panel canvas-panel">
-        <div class="panel-title">
-          <span>AUTHORITATIVE TACTICAL PLOT (10 Hz SNAPSHOTS / INTERPOLATED)</span>
-          <span id="val-env">SEA STATE -- | LAYER -- | DEPTH --</span>
-        </div>
-        <canvas id="tactical-canvas" width="760" height="420"></canvas>
-        <div class="panel-title">
-          <span>PASSIVE BROADBAND SONAR WATERFALL (000° – 359° TRUE)</span>
-          <span id="val-towed">TOWED ARRAY: --</span>
-        </div>
-        <canvas id="sonar-waterfall-canvas" width="720" height="140" style="min-height:140px; height:140px;"></canvas>
-      </section>
-
-      <aside class="sidebar">
-        <section class="panel">
-          <div class="panel-title"><span>OWN SHIP (USS VIRGINIA SSN-774)</span></div>
-          <div class="kv"><span>POSITION</span><strong id="sub-pos">--</strong></div>
-          <div class="kv"><span>HEADING / ORD</span><strong id="sub-hdg">--</strong></div>
-          <div class="kv"><span>SPEED / ORD</span><strong id="sub-spd">--</strong></div>
-          <div class="kv"><span>DEPTH / ORD</span><strong id="sub-dep">--</strong></div>
-          <div class="kv"><span>HULL INTEGRITY</span><strong id="sub-hull">--</strong></div>
-          <div class="kv"><span>MK-48 / DECOYS</span><strong id="sub-torps">--</strong></div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-title"><span>CONN, SONAR &amp; WEPS ORDERS</span></div>
-          <div class="order-row">
-            <label>HEADING (0–360°)
+    <!-- MAIN BODY: LEFT SHIP CONTROL + RIGHT STATION VIEW -->
+    <main id="main-workspace">
+      <aside id="left-sidebar">
+        <section class="crt-panel">
+          <div class="panel-header">
+            <span>HELM &amp; DIVING TELEGRAPH</span>
+            <span id="sidebar-cav-warn" style="color:var(--crt-green); font-size:10px;">QUIET</span>
+          </div>
+          <div class="kv-row"><span class="kv-key">POS:</span><span class="kv-val cyan" id="sub-pos">--</span></div>
+          <div class="kv-row"><span class="kv-key">MK-48 / ADC:</span><span class="kv-val" id="sub-torps">-- / --</span></div>
+          <div class="control-grid">
+            <label>CRS (0–360°)
               <input id="order-heading" type="number" min="0" max="360" step="1" value="90" />
             </label>
-            <button id="btn-set-heading" class="btn">ORDER CRS</button>
-          </div>
-          <div class="order-row">
-            <label>SPEED (-5–32 KT)
+            <button id="btn-set-heading" class="mil-btn">ORD CRS</button>
+            <label>SPD (-5–32 KT)
               <input id="order-speed" type="number" min="-5" max="32" step="1" value="10" />
             </label>
-            <button id="btn-set-speed" class="btn">ORDER SPD</button>
-          </div>
-          <div class="order-row">
-            <label>DEPTH (0–400 M)
+            <button id="btn-set-speed" class="mil-btn">ORD SPD</button>
+            <label>DEP (0–400 M)
               <input id="order-depth" type="number" min="0" max="400" step="5" value="45" />
             </label>
-            <button id="btn-set-depth" class="btn">ORDER DEP</button>
+            <button id="btn-set-depth" class="mil-btn">ORD DEP</button>
           </div>
-          <div class="order-row">
-            <label>TORPEDO BRG (0–360°)
-              <input id="order-torp-brg" type="number" min="0" max="360" step="1" value="45" />
-            </label>
-            <button id="btn-fire-torp" class="btn">FIRE MK-48</button>
-          </div>
-          <div style="display:flex; gap:6px;">
-            <button id="btn-active-ping" class="btn primary" style="flex:1;">ACTIVE PING</button>
-            <button id="btn-toggle-array" class="btn" style="flex:1;">TOWED ARRAY</button>
-            <button id="btn-deploy-decoy" class="btn" style="flex:1;">DECOY</button>
-          </div>
-          <div id="cmd-ack" class="cmd-ack">Awaiting orders...</div>
+          <div id="cmd-ack" class="cmd-ack">Awaiting server connection...</div>
         </section>
 
-        <section class="panel">
-          <div class="panel-title">
-            <span>CLIENT-VISIBLE CONTACTS</span>
-            <span id="contact-count">0</span>
+        <section class="crt-panel" style="flex:1; min-height:140px;">
+          <div class="panel-header">
+            <span>SONAR TRACKS (FOG-OF-WAR)</span>
+            <span id="contact-count" class="cyan">0</span>
           </div>
-          <ul id="contacts-list" class="contacts-list">
-            <li class="muted">No contacts received yet.</li>
-          </ul>
+          <div class="table-wrap">
+            <table class="mil-table">
+              <thead>
+                <tr><th>ID</th><th>CLASS</th><th>BRG</th><th>RNG/TMA</th></tr>
+              </thead>
+              <tbody id="contacts-table-body">
+                <tr><td colspan="4" class="muted">No tracks detected.</td></tr>
+              </tbody>
+            </table>
+          </div>
         </section>
 
-        <section class="panel log-panel">
-          <div class="panel-title"><span>NETWORK &amp; WORLD EVENTS</span></div>
+        <section class="crt-panel" style="height:175px;">
+          <div class="panel-header">
+            <span>DISPATCH &amp; WORLD EVENTS</span>
+            <span id="val-snap-seq" class="muted">SEQ 0</span>
+          </div>
           <div id="event-log" class="event-log"></div>
         </section>
       </aside>
+
+      <section id="station-viewport">
+        <!-- F1: GEO / TACTICAL PLOT -->
+        <div id="screen-tactical" class="station-screen active">
+          <div class="crt-panel" style="flex:1; position:relative;">
+            <div class="panel-header">
+              <span>MEDITERRANEAN AUTHORITATIVE TACTICAL CHART (ROOM: <strong id="val-world-id">--</strong>)</span>
+              <span id="val-env">SEA STATE -- | LAYER -- | SEABED --</span>
+            </div>
+            <div style="flex:1; position:relative; min-height:0;">
+              <div id="tactical-leaflet-map" style="width:100%; height:100%;"></div>
+              <canvas id="tactical-overlay-canvas" style="position:absolute; inset:0; width:100%; height:100%; pointer-events:none; z-index:450;"></canvas>
+            </div>
+          </div>
+        </div>
+
+        <!-- F2: SONAR & TMA -->
+        <div id="screen-sonar" class="station-screen">
+          <div class="sonar-grid">
+            <div class="crt-panel" style="grid-column:1/2; grid-row:1/2;">
+              <div class="panel-header">
+                <span>AN/BQQ-10 PASSIVE BROADBAND WATERFALL (000°–359° TRUE)</span>
+                <div style="display:flex; gap:6px; align-items:center;">
+                  <span id="sonar-cursor-brg" class="cyan">BRG: 000°</span>
+                  <button id="btn-active-ping" class="mil-btn amber">ACTIVE PING (3.5 kHz)</button>
+                  <button id="btn-toggle-array" class="mil-btn active">TB-29A ARRAY: DEPLOYED</button>
+                </div>
+              </div>
+              <div style="flex:1; min-height:0; position:relative;">
+                <canvas id="sonar-waterfall-canvas" style="width:100%; height:100%; display:block; cursor:crosshair;"></canvas>
+              </div>
+            </div>
+
+            <div class="crt-panel" style="grid-column:1/2; grid-row:2/3;">
+              <div class="panel-header">
+                <span>NARROWBAND LOFAR / DEMON SPECTRUM (10–400 Hz)</span>
+                <span id="sonar-spectrum-target" class="amber">NO TRACK SELECTED</span>
+              </div>
+              <div style="flex:1; min-height:0;">
+                <canvas id="sonar-demon-canvas" style="width:100%; height:100%; display:block;"></canvas>
+              </div>
+            </div>
+
+            <div class="crt-panel" style="grid-column:2/3; grid-row:1/3;">
+              <div class="panel-header">
+                <span>TARGET MOTION ANALYSIS (TMA)</span>
+                <span id="tma-track-id" class="cyan">--</span>
+              </div>
+              <canvas id="tma-mini-canvas" width="300" height="200" style="width:100%; height:200px; background:#020604; border:1px solid var(--border-color);"></canvas>
+              <div class="kv-row"><span class="kv-key">DESIGNATION:</span><span class="kv-val" id="tma-desig">--</span></div>
+              <div class="kv-row"><span class="kv-key">BEARING:</span><span class="kv-val cyan" id="tma-brg">--</span></div>
+              <div class="kv-row"><span class="kv-key">SNR:</span><span class="kv-val" id="tma-snr">--</span></div>
+              <div class="kv-row"><span class="kv-key">SOLUTION:</span><span class="kv-val amber" id="tma-quality">--</span></div>
+              <div class="kv-row"><span class="kv-key">RANGE:</span><span class="kv-val" id="tma-range">PASSIVE BRG ONLY</span></div>
+              <div class="kv-row"><span class="kv-key">CRS / SPD:</span><span class="kv-val" id="tma-crs-spd">--</span></div>
+              <div style="font-size:10px; color:var(--text-muted); margin-top:auto;">
+                Passively detected contacts expose bearing &amp; SNR only until ranged by Active Ping (3.5 kHz).
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- F3: FIRE CONTROL / WEAPONS -->
+        <div id="screen-weapons" class="station-screen">
+          <div class="weapons-grid">
+            <div class="crt-panel">
+              <div class="panel-header"><span>FIRE CONTROL SOLUTION</span><span id="fc-selected-target" class="amber">NO TARGET</span></div>
+              <div class="kv-row"><span class="kv-key">MK-48 ADCAP REMAINING:</span><span class="kv-val cyan" id="weps-torp-count">16</span></div>
+              <div class="kv-row"><span class="kv-key">ADC MK 3 DECOYS:</span><span class="kv-val amber" id="weps-decoy-count">8</span></div>
+              <div class="control-grid" style="margin-top:8px;">
+                <label>LAUNCH BEARING (0–360°)
+                  <input id="order-torp-brg" type="number" min="0" max="360" step="1" value="45" />
+                </label>
+                <button id="btn-fire-torp" class="mil-btn red">FIRE MK-48</button>
+              </div>
+              <div style="display:flex; gap:6px; margin-top:8px;">
+                <button id="btn-sync-torp-brg" class="mil-btn" style="flex:1;">SYNC TARGET BRG</button>
+                <button id="btn-deploy-decoy" class="mil-btn amber" style="flex:1;">DEPLOY ADC DECOY</button>
+              </div>
+              <div style="font-size:11px; color:var(--text-muted); margin-top:10px;">
+                Server-authoritative torpedoes home at 45 kts, are lured by ADC decoys within 1.2 NM, and are destroyed on coastline/seabed impact.
+              </div>
+            </div>
+
+            <div class="crt-panel">
+              <div class="panel-header"><span>FIRE CONTROL POLAR PPI SCOPE (12 NM)</span><span class="cyan">INTERPOLATED</span></div>
+              <div style="flex:1; min-height:0;">
+                <canvas id="fc-scope-canvas" style="width:100%; height:100%; display:block;"></canvas>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- F4: MANEUVERING / SVP -->
+        <div id="screen-maneuvering" class="station-screen">
+          <div class="maneuver-grid">
+            <div class="crt-panel">
+              <div class="panel-header"><span>SOUND VELOCITY PROFILE &amp; LAYER</span><span id="svp-layer-label" class="amber">--</span></div>
+              <div style="flex:1; min-height:0;">
+                <canvas id="svp-canvas" style="width:100%; height:100%; display:block;"></canvas>
+              </div>
+            </div>
+            <div class="crt-panel">
+              <div class="panel-header"><span>SHIP CONTROL &amp; ENVIRONMENT</span></div>
+              <div class="kv-row"><span class="kv-key">SEA STATE:</span><span class="kv-val" id="env-sea-state">--</span></div>
+              <div class="kv-row"><span class="kv-key">WIND:</span><span class="kv-val" id="env-wind">--</span></div>
+              <div class="kv-row"><span class="kv-key">THERMOCLINE LAYER:</span><span class="kv-val amber" id="env-layer">--</span></div>
+              <div class="kv-row"><span class="kv-key">LOCAL SEABED:</span><span class="kv-val cyan" id="env-seabed">--</span></div>
+              <div class="kv-row"><span class="kv-key">KEEL CLEARANCE:</span><span class="kv-val" id="env-clearance">--</span></div>
+              <div class="kv-row"><span class="kv-key">TB-29A TOWED ARRAY:</span><span class="kv-val" id="env-towed">--</span></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- F5: HULL & DISPATCH -->
+        <div id="screen-damage" class="station-screen">
+          <div class="crt-panel" style="flex:1;">
+            <div class="panel-header"><span>SESSION TELEMETRY &amp; HULL STATUS</span><span id="val-session-id" class="cyan">--</span></div>
+            <div class="kv-row"><span class="kv-key">AUTHORITATIVE WORLD:</span><span class="kv-val" id="dmg-world">--</span></div>
+            <div class="kv-row"><span class="kv-key">HULL INTEGRITY:</span><span class="kv-val cyan" id="dmg-hull">100%</span></div>
+            <div class="kv-row"><span class="kv-key">LAST SNAPSHOT:</span><span class="kv-val" id="val-last-snap">--</span></div>
+            <div class="kv-row"><span class="kv-key">RTT LATENCY:</span><span class="kv-val amber" id="val-latency">-- ms</span></div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
   <script src="js/protocol.js"></script>
   <script src="js/network.js"></script>
+  <script src="js/audio.js"></script>
   <script src="js/renderer.js"></script>
   <script src="js/main.js"></script>
 </body>
