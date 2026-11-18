@@ -275,6 +275,19 @@
     renderer.renderActiveStation(activeStation, selectedContactId);
   });
 
+  document.getElementById('btn-periscope-slew-left').addEventListener('click', () => {
+    renderer.slewPeriscope(-1);
+    renderer.renderActiveStation(activeStation, selectedContactId);
+  });
+  document.getElementById('btn-periscope-slew-right').addEventListener('click', () => {
+    renderer.slewPeriscope(1);
+    renderer.renderActiveStation(activeStation, selectedContactId);
+  });
+  document.getElementById('btn-periscope-center').addEventListener('click', () => {
+    renderer.centerPeriscope();
+    renderer.renderActiveStation(activeStation, selectedContactId);
+  });
+
   document.getElementById('btn-sonar-clear-track').addEventListener('click', () => {
     selectedContactId = null;
     if (lastSnapshot) updateUI(lastSnapshot);
@@ -316,6 +329,9 @@
     if (e.key === 'F4') { e.preventDefault(); switchStation('maneuvering'); }
     if (e.key === 'F5') { e.preventDefault(); switchStation('damage'); }
     if (e.key === 'F6') { e.preventDefault(); switchStation('periscope'); }
+    if (activeStation === 'periscope' && e.key === 'ArrowLeft') { e.preventDefault(); renderer.slewPeriscope(-1); }
+    if (activeStation === 'periscope' && e.key === 'ArrowRight') { e.preventDefault(); renderer.slewPeriscope(1); }
+    if (activeStation === 'periscope' && e.key === 'Home') { e.preventDefault(); renderer.centerPeriscope(); }
   });
 
   let lastFrameMs = performance.now();
