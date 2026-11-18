@@ -36,16 +36,20 @@
       this.leafletMap = L.map(el, {
         center: [37.18, 15.50],
         zoom: 10,
-        zoomControl: true,
+        zoomControl: false,
         attributionControl: false
       });
-      L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-        maxZoom: 18
+      // ESRI World Ocean Basemap (Real NOAA/GEBCO Bathymetry Contours, no API key required)
+      L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/Ocean/World_Ocean_Base/MapServer/tile/{z}/{y}/{x}', {
+        maxZoom: 14
       }).addTo(this.leafletMap);
+      // OpenSeaMap Nautical Seamarks & Harbors
       L.tileLayer('https://tiles.openseamap.org/seamark/{z}/{x}/{y}.png', {
-        maxZoom: 18,
-        opacity: 0.7
+        maxZoom: 16,
+        opacity: 0.78
       }).addTo(this.leafletMap);
+      const tilePane = this.leafletMap.getPane('tilePane');
+      if (tilePane) tilePane.classList.add('bathymetry-filter');
       this.mapInitialized = true;
     }
 

@@ -171,6 +171,12 @@
   });
 
   document.getElementById('btn-connect').addEventListener('click', () => {
+    if (!window.MultiplayerAudio.enabled) {
+      window.MultiplayerAudio.enable();
+      const audioBtn = document.getElementById('btn-audio-toggle');
+      audioBtn.textContent = 'AUDIO: ON';
+      audioBtn.classList.add('active');
+    }
     net.connect(
       wsInput.value.trim(),
       document.getElementById('input-callsign').value.trim(),
@@ -204,7 +210,13 @@
     if (e.key === 'F5') { e.preventDefault(); switchStation('damage'); }
   });
 
-  function loop() {
+  let lastFrameMs = performance.now();
+  function loop(now) {
+    const dt = Math.min(0.1, Math.max(0.001, (now - lastFrameMs) / 1000));
+    lastFrameMs = now;
+    if (lastSnapshot) {
+      window.MultiplayerAudio.updateTelemetry(lastSnapshot, selectedContactId, activeStation, dt);
+    }
     renderer.renderActiveStation(activeStation, selectedContactId);
     requestAnimationFrame(loop);
   }

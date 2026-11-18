@@ -279,6 +279,10 @@ input, .mil-select {
 .red { color: var(--crt-red); }
 .muted { color: var(--text-muted); }
 
+.bathymetry-filter {
+  filter: invert(90%) hue-rotate(155deg) brightness(0.75) contrast(1.35) saturate(0.65);
+}
+
 @media (max-width: 1080px) {
   #main-workspace { grid-template-columns: 1fr; overflow-y: auto; }
   .sonar-grid, .weapons-grid, .maneuver-grid { grid-template-columns: 1fr; grid-template-rows: auto; }
