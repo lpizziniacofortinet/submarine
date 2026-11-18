@@ -19,6 +19,8 @@
       this.currSnapshot = null;
       this.snapshotArrivalMs = 0;
       this.snapshotIntervalMs = 100;
+      this.periscopeZoom = 1;
+      this.periscopeFovDeg = 60;
 
       // Offscreen Sonar Waterfall buffer
       this.wfBuffer = document.createElement('canvas');
@@ -89,6 +91,8 @@
         this.renderFireControlScope(selectedContactId);
       } else if (station === 'maneuvering') {
         this.renderSvpCanvas();
+      } else if (station === 'periscope') {
+        this.renderPeriscope();
       }
     }
 
@@ -398,6 +402,161 @@
       ctx.beginPath();
       ctx.arc(cx, cy, 4, 0, Math.PI * 2);
       ctx.fill();
+    }
+
+    setPeriscopeZoom(direction) {
+      this.periscopeZoom = Math.max(1, Math.min(4, this.periscopeZoom + direction * 0.5));
+      const label = document.getElementById('periscope-zoom-label');
+      if (label) label.textContent = `MAG ${this.periscopeZoom.toFixed(1)}×`;
+      const fov = document.getElementById('periscope-fov');
+      if (fov) fov.textContent = `${(this.periscopeFovDeg / this.periscopeZoom).toFixed(0)}°`;
+    }
+
+    renderPeriscope() {
+      const canvas = document.getElementById('periscope-canvas');
+      if (!canvas) return;
+      if (canvas.width !== canvas.clientWidth || canvas.height !== canvas.clientHeight) {
+        canvas.width = Math.max(1, canvas.clientWidth || 900);
+        canvas.height = Math.max(1, canvas.clientHeight || 480);
+      }
+
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return;
+      const w = canvas.width;
+      const h = canvas.height;
+      const snap = this.currSnapshot;
+      const sub = snap ? snap.ownSub : { headingDeg: 90, depthM: 0 };
+      const env = snap ? snap.environment : { seaState: 2, windSpeedKts: 0 };
+      const seaState = Number(env.seaState) || 0;
+      const time = performance.now() * 0.00012;
+      const horizonY = Math.round(h * (0.535 + Math.min(0.035, seaState * 0.004)));
+
+      // Sky and haze: intentionally procedural, cosmetic presentation only.
+      const sky = ctx.createLinearGradient(0, 0, 0, horizonY);
+      sky.addColorStop(0, '#172b37');
+      sky.addColorStop(0.55, '#45616a');
+      sky.addColorStop(1, '#a3aaa0');
+      ctx.fillStyle = sky;
+      ctx.fillRect(0, 0, w, horizonY);
+
+      const haze = ctx.createLinearGradient(0, horizonY - h * 0.12, 0, horizonY + h * 0.08);
+      haze.addColorStop(0, 'rgba(185,196,184,0)');
+      haze.addColorStop(0.55, 'rgba(193,202,190,0.36)');
+      haze.addColorStop(1, 'rgba(173,190,185,0)');
+      ctx.fillStyle = haze;
+      ctx.fillRect(0, horizonY - h * 0.12, w, h * 0.2);
+
+      const water = ctx.createLinearGradient(0, horizonY, 0, h);
+      water.addColorStop(0, '#536b6b');
+      water.addColorStop(0.18, '#28464e');
+      water.addColorStop(1, '#081b27');
+      ctx.fillStyle = water;
+      ctx.fillRect(0, horizonY, w, h - horizonY);
+
+      // Stable, low-amplitude wavelets; no synthetic sensor returns.
+      const waveCount = Math.max(14, Math.floor(h / 15));
+      for (let i = 0; i < waveCount; i++) {
+        const yBase = horizonY + 12 + i * ((h - horizonY - 24) / waveCount);
+        const alpha = 0.035 + 0.055 * (i / waveCount);
+        const span = w * (0.18 + (i % 5) * 0.09);
+        const phase = time * (0.7 + i * 0.017) + i * 1.7;
+        ctx.strokeStyle = `rgba(190,211,202,${alpha.toFixed(3)})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        for (let x = 0; x <= span; x += 8) {
+          const y = yBase + Math.sin(x * (0.012 + i * 0.00012) + phase) * (1 + i / waveCount * 2.2);
+          if (x === 0) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+      }
+
+      // Fine azimuth tape.
+      const fov = this.periscopeFovDeg / this.periscopeZoom;
+      ctx.fillStyle = 'rgba(4,13,18,0.46)';
+      ctx.fillRect(0, 0, w, 42);
+      const heading = Number(sub.headingDeg) || 0;
+      const first = Math.floor((heading - fov / 2) / 5) * 5;
+      const last = Math.ceil((heading + fov / 2) / 5) * 5;
+      ctx.font = '10px Consolas, monospace';
+      ctx.textAlign = 'center';
+      for (let bearing = first; bearing <= last; bearing += 5) {
+        const relative = ((bearing - heading + 540) % 360) - 180;
+        const x = w / 2 + (relative / fov) * w;
+        if (x < -4 || x > w + 4) continue;
+        const major = ((bearing % 10) + 10) % 10 === 0;
+        ctx.strokeStyle = major ? 'rgba(219,239,230,.78)' : 'rgba(193,218,213,.38)';
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, major ? 15 : 9);
+        ctx.stroke();
+        if (major) {
+          ctx.fillStyle = 'rgba(230,241,232,.88)';
+          ctx.fillText(String((bearing + 360) % 360).padStart(3, '0'), x, 28);
+        }
+      }
+
+      // Reticle, stadia and center index.
+      ctx.save();
+      ctx.strokeStyle = 'rgba(209,237,222,0.64)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(w * 0.5, 48); ctx.lineTo(w * 0.5, h - 28);
+      ctx.moveTo(18, horizonY); ctx.lineTo(w - 18, horizonY);
+      ctx.stroke();
+      ctx.beginPath(); ctx.arc(w * 0.5, h * 0.52, Math.min(w, h) * 0.055, 0, Math.PI * 2); ctx.stroke();
+      for (let i = -5; i <= 5; i++) {
+        const y = h * 0.52 + i * 18;
+        const tick = i === 0 ? 15 : 7;
+        ctx.beginPath(); ctx.moveTo(w * 0.5 - tick, y); ctx.lineTo(w * 0.5 + tick, y); ctx.stroke();
+      }
+      ctx.restore();
+
+      // Amber cues are server-ranged surface tracks only, never inferred optical detections.
+      const surfaceTracks = snap ? (snap.contacts || []).filter((c) =>
+        c.ranged && c.rangeNm !== null && c.rangeNm !== undefined &&
+        c.depthM !== null && c.depthM !== undefined && c.depthM <= 2.0 &&
+        ['MERCHANT', 'WARSHIP', 'SURFACE'].includes(String(c.category).toUpperCase())
+      ) : [];
+      let inFovCount = 0;
+      for (const track of surfaceTracks) {
+        const relative = ((track.bearingDeg - heading + 540) % 360) - 180;
+        if (Math.abs(relative) > fov / 2) continue;
+        inFovCount++;
+        const x = w / 2 + (relative / fov) * w;
+        const y = horizonY - 18;
+        ctx.strokeStyle = 'rgba(235,190,119,.95)';
+        ctx.fillStyle = 'rgba(245,199,128,.95)';
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(x, 42); ctx.lineTo(x, y - 10); ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.beginPath();
+        ctx.moveTo(x, y - 7); ctx.lineTo(x + 6, y); ctx.lineTo(x, y + 7); ctx.lineTo(x - 6, y); ctx.closePath();
+        ctx.fill();
+        ctx.font = '10px Consolas, monospace';
+        ctx.textAlign = x > w * 0.78 ? 'right' : 'left';
+        const labelX = x > w * 0.78 ? x - 10 : x + 10;
+        ctx.fillText(`${track.id} · ${Number(track.rangeNm).toFixed(1)} NM`, labelX, y - 10);
+      }
+
+      // Scope edge vignette and lower glass tint.
+      const vignette = ctx.createRadialGradient(w / 2, h / 2, h * 0.18, w / 2, h / 2, Math.max(w, h) * 0.68);
+      vignette.addColorStop(0, 'rgba(0,0,0,0)');
+      vignette.addColorStop(1, 'rgba(0,7,12,0.58)');
+      ctx.fillStyle = vignette;
+      ctx.fillRect(0, 0, w, h);
+
+      ctx.textAlign = 'left';
+      ctx.font = '9px Consolas, monospace';
+      ctx.fillStyle = 'rgba(231,194,137,.92)';
+      const cueText = snap
+        ? (inFovCount > 0 ? `SERVER-RANGED SURFACE TRACK CUES: ${inFovCount}` : 'NO RANGED SURFACE TRACK CUES IN CURRENT FOV')
+        : 'AWAITING AUTHORITATIVE WORLD SNAPSHOT';
+      ctx.fillText(cueText, 14, h - 16);
+
+      const fovLabel = document.getElementById('periscope-fov');
+      if (fovLabel) fovLabel.textContent = `${fov.toFixed(0)}°`;
+      const zoomLabel = document.getElementById('periscope-zoom-label');
+      if (zoomLabel) zoomLabel.textContent = `MAG ${this.periscopeZoom.toFixed(1)}×`;
     }
 
     renderSvpCanvas() {
