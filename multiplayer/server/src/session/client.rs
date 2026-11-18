@@ -47,6 +47,7 @@ pub struct ClientSession {
     pub session_id: String,
     pub client_name: String,
     pub role: WatchRole,
+    pub room_id: String,
     pub controlled_entity_id: String,
     pub can_command_own_sub: bool,
     pub connected: bool,
@@ -63,12 +64,21 @@ impl SessionManager {
         Self::default()
     }
 
+    pub fn normalize_vessel_id(raw: Option<&str>) -> String {
+        match raw.unwrap_or("SSN-774").trim().to_ascii_uppercase().as_str() {
+            "OPFOR-SUB" => "OPFOR-SUB".to_string(),
+            _ => "SSN-774".to_string(),
+        }
+    }
+
     /// Registers a new session or resumes an existing one when `requested_session_id` matches.
     pub fn connect_or_resume(
         &mut self,
         client_name: String,
         requested_session_id: Option<String>,
         requested_role: Option<String>,
+        room_id: String,
+        requested_vessel_id: Option<String>,
     ) -> (ClientSession, bool) {
         let now = Instant::now();
         if let Some(req_id) = requested_session_id {
@@ -87,6 +97,7 @@ impl SessionManager {
 
         let session_id = Uuid::new_v4().to_string();
         let role = WatchRole::from_str_or_default(requested_role.as_deref());
+        let vessel_id = Self::normalize_vessel_id(requested_vessel_id.as_deref());
         let session = ClientSession {
             session_id: session_id.clone(),
             client_name: if client_name.trim().is_empty() {
@@ -95,7 +106,8 @@ impl SessionManager {
                 client_name
             },
             role,
-            controlled_entity_id: "SSN-774".to_string(),
+            room_id,
+            controlled_entity_id: vessel_id,
             can_command_own_sub: true,
             connected: true,
             last_seen: now,
@@ -129,7 +141,6 @@ impl SessionManager {
         self.sessions.len()
     }
 
-    /// Marks timed-out active sessions disconnected and prunes stale disconnected entries.
     pub fn prune_expired(&mut self, heartbeat_timeout: Duration) -> usize {
         let now = Instant::now();
         let mut timed_out = 0usize;

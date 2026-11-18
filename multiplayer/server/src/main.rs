@@ -1,9 +1,9 @@
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
-use ssn774_server::config::ServerConfig;
-use ssn774_server::world::simulation::{spawn_simulation_loops, SimulationRuntime};
 use ssn774_server::build_router;
+use ssn774_server::config::ServerConfig;
+use ssn774_server::world::rooms::RoomManager;
 
 #[tokio::main]
 async fn main() {
@@ -15,10 +15,9 @@ async fn main() {
 
     let config = ServerConfig::from_env();
     let bind_addr = config.bind_addr();
-    let runtime = SimulationRuntime::new(config);
-    spawn_simulation_loops(runtime.clone());
+    let rooms = RoomManager::new(config.clone());
 
-    let app = build_router(runtime);
+    let app = build_router(rooms, &config);
     let listener = tokio::net::TcpListener::bind(&bind_addr)
         .await
         .expect("Failed to bind server address");

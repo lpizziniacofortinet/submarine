@@ -20,6 +20,15 @@
         <label>CALLSIGN:
           <input id="input-callsign" type="text" value="CONN-ALPHA" maxlength="32" />
         </label>
+        <label>ROOM:
+          <input id="input-room-id" type="text" value="med-patrol-alpha" maxlength="32" />
+        </label>
+        <label>VESSEL:
+          <select id="select-vessel">
+            <option value="SSN-774">USS VIRGINIA (SSN-774)</option>
+            <option value="OPFOR-SUB">K-561 KAZAN (OPFOR)</option>
+          </select>
+        </label>
         <label>ROLE:
           <select id="select-role">
             <option value="COMMANDER">COMMANDER</option>
@@ -51,7 +60,12 @@
           <span>AUTHORITATIVE TACTICAL PLOT (10 Hz SNAPSHOTS / INTERPOLATED)</span>
           <span id="val-env">SEA STATE -- | LAYER -- | DEPTH --</span>
         </div>
-        <canvas id="tactical-canvas" width="760" height="520"></canvas>
+        <canvas id="tactical-canvas" width="760" height="420"></canvas>
+        <div class="panel-title">
+          <span>PASSIVE BROADBAND SONAR WATERFALL (000° – 359° TRUE)</span>
+          <span id="val-towed">TOWED ARRAY: --</span>
+        </div>
+        <canvas id="sonar-waterfall-canvas" width="720" height="140" style="min-height:140px; height:140px;"></canvas>
       </section>
 
       <aside class="sidebar">
@@ -61,7 +75,8 @@
           <div class="kv"><span>HEADING / ORD</span><strong id="sub-hdg">--</strong></div>
           <div class="kv"><span>SPEED / ORD</span><strong id="sub-spd">--</strong></div>
           <div class="kv"><span>DEPTH / ORD</span><strong id="sub-dep">--</strong></div>
-          <div class="kv"><span>MK-48 ADCAP</span><strong id="sub-torps">--</strong></div>
+          <div class="kv"><span>HULL INTEGRITY</span><strong id="sub-hull">--</strong></div>
+          <div class="kv"><span>MK-48 / DECOYS</span><strong id="sub-torps">--</strong></div>
         </section>
 
         <section class="panel">
@@ -90,7 +105,11 @@
             </label>
             <button id="btn-fire-torp" class="btn">FIRE MK-48</button>
           </div>
-          <button id="btn-active-ping" class="btn primary">ACTIVE SONAR PING (3.5 kHz)</button>
+          <div style="display:flex; gap:6px;">
+            <button id="btn-active-ping" class="btn primary" style="flex:1;">ACTIVE PING</button>
+            <button id="btn-toggle-array" class="btn" style="flex:1;">TOWED ARRAY</button>
+            <button id="btn-deploy-decoy" class="btn" style="flex:1;">DECOY</button>
+          </div>
           <div id="cmd-ack" class="cmd-ack">Awaiting orders...</div>
         </section>
 

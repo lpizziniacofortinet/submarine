@@ -127,6 +127,21 @@
         ctx.fillText(`${c1.id} (${c1.rangeNm.toFixed(1)}NM)`, px + 8, py - 4);
       }
 
+      // Draw acoustic decoys
+      for (const d of this.currSnapshot.decoys || []) {
+        const dxNm = (d.lon - subLon) * 60 * cosLat;
+        const dyNm = (d.lat - subLat) * 60;
+        const px = cx + dxNm * pxPerNm;
+        const py = cy - dyNm * pxPerNm;
+        ctx.strokeStyle = '#ffb000';
+        ctx.beginPath();
+        ctx.arc(px, py, 4, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.font = '9px Courier New';
+        ctx.fillStyle = '#ffb000';
+        ctx.fillText(d.id, px + 6, py + 3);
+      }
+
       // Draw active MK-48 ADCAP torpedoes
       for (const w1 of this.currSnapshot.weapons || []) {
         const w0 = this.prevSnapshot
@@ -169,5 +184,60 @@
     }
   }
 
+  class SonarWaterfallRenderer {
+    constructor(canvasId) {
+      this.canvas = document.getElementById(canvasId);
+      this.ctx = this.canvas ? this.canvas.getContext('2d') : null;
+      if (this.ctx && this.canvas) {
+        this.ctx.fillStyle = '#020704';
+        this.ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+      }
+    }
+
+    step(snapshot) {
+      if (!this.ctx || !this.canvas || !snapshot) return;
+      const ctx = this.ctx;
+      const w = this.canvas.width;
+      const h = this.canvas.height;
+      if (w <= 0 || h <= 16) return;
+
+      ctx.drawImage(this.canvas, 0, 14, w, h - 15, 0, 15, w, h - 15);
+      const row = ctx.createImageData(w, 1);
+      const data = row.data;
+      const contacts = snapshot.contacts || [];
+      const sub = snapshot.ownSub;
+
+      for (let x = 0; x < w; x++) {
+        const brg = (x / w) * 360;
+        const relBrg = (brg - sub.headingDeg + 360) % 360;
+        const inBaffles = !sub.towedArrayDeployed && relBrg >= 150 && relBrg <= 210;
+        let intensity = inBaffles ? Math.random() * 10 : 12 + Math.random() * 22;
+
+        for (const c of contacts) {
+          const diff = Math.abs(((brg - c.bearingDeg + 540) % 360) - 180);
+          if (diff < 3.5) {
+            intensity += Math.exp(-(diff * diff) / 2.0) * Math.min(220, Math.max(50, (c.snrDb + 8) * 8));
+          }
+        }
+        const v = Math.min(255, Math.floor(intensity));
+        const idx = x * 4;
+        data[idx] = Math.floor(v * 0.15);
+        data[idx + 1] = v;
+        data[idx + 2] = Math.floor(v * 0.35);
+        data[idx + 3] = 255;
+      }
+      ctx.putImageData(row, 0, 14);
+
+      ctx.fillStyle = '#040a06';
+      ctx.fillRect(0, 0, w, 14);
+      ctx.fillStyle = '#00ff66';
+      ctx.font = '9px Courier New';
+      for (let deg = 0; deg < 360; deg += 45) {
+        ctx.fillText(`${deg.toString().padStart(3, '0')}°`, (deg / 360) * w + 2, 10);
+      }
+    }
+  }
+
   root.TacticalCanvasRenderer = TacticalCanvasRenderer;
+  root.SonarWaterfallRenderer = SonarWaterfallRenderer;
 })(window);

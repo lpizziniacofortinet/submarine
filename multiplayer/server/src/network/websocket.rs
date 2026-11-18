@@ -1,33 +1,36 @@
 use std::sync::Arc;
 use axum::extract::ws::{Message, WebSocket};
 use futures_util::{SinkExt, StreamExt};
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc, watch};
 use tracing::{debug, info, warn};
 
 use crate::commands::validation::validate_and_apply_command;
 use crate::network::protocol::{
-    CommandPayload, HelloPayload, IncomingEnvelope, PingPayload, PongPayload, ServerMessage,
-    WelcomePayload, PROTOCOL_VERSION_V1,
+    ClientWorldSnapshot, CommandPayload, HelloPayload, IncomingEnvelope, PingPayload, PongPayload,
+    ServerMessage, WelcomePayload, WorldEventPayload, PROTOCOL_VERSION_V1,
 };
+use crate::world::rooms::RoomManager;
 use crate::world::simulation::SimulationRuntime;
 
-pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
+pub async fn handle_socket(socket: WebSocket, rooms: Arc<RoomManager>) {
     let (mut ws_sender, mut ws_receiver) = socket.split();
 
-    // Reliable bounded channel for discrete control messages (WELCOME, PONG, COMMAND_RESULT, WORLD_EVENT, ERROR)
     let (ctrl_tx, mut ctrl_rx) = mpsc::channel::<ServerMessage>(64);
-    let (handshake_tx, mut handshake_rx) = tokio::sync::watch::channel(false);
-    let mut snapshot_rx = runtime.snapshot_tx.subscribe();
-    let mut event_rx = runtime.event_tx.subscribe();
+    let (stream_tx, mut stream_rx) =
+        mpsc::channel::<(watch::Receiver<Arc<ClientWorldSnapshot>>, broadcast::Receiver<WorldEventPayload>)>(1);
 
+    let mut active_room: Option<Arc<SimulationRuntime>> = None;
     let mut session_id: Option<String> = None;
     let mut handshake_complete = false;
 
-    // Writer task: prioritizes discrete control/event messages and forwards latest snapshot without stale queueing
+    // Writer task waits until handshake completes and room receivers are supplied,
+    // guaranteeing WELCOME + initial WORLD_SNAPSHOT always arrive first.
     let writer_handle = tokio::spawn(async move {
+        let mut snapshot_rx: Option<watch::Receiver<Arc<ClientWorldSnapshot>>> = None;
+        let mut event_rx: Option<broadcast::Receiver<WorldEventPayload>> = None;
+
         loop {
-            let ready = *handshake_rx.borrow_and_update();
-            if !ready {
+            if snapshot_rx.is_none() {
                 tokio::select! {
                     biased;
                     Some(msg) = ctrl_rx.recv() => {
@@ -37,15 +40,17 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
                             }
                         }
                     }
-                    changed = handshake_rx.changed() => {
-                        if changed.is_err() {
-                            break;
-                        }
+                    Some((srx, erx)) = stream_rx.recv() => {
+                        snapshot_rx = Some(srx);
+                        event_rx = Some(erx);
                     }
                     else => break,
                 }
                 continue;
             }
+
+            let srx = snapshot_rx.as_mut().unwrap();
+            let erx = event_rx.as_mut().unwrap();
 
             tokio::select! {
                 biased;
@@ -56,7 +61,7 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
                         }
                     }
                 }
-                Ok(evt) = event_rx.recv() => {
+                Ok(evt) = erx.recv() => {
                     let msg = ServerMessage::WorldEvent {
                         version: PROTOCOL_VERSION_V1,
                         payload: evt,
@@ -67,11 +72,11 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
                         }
                     }
                 }
-                changed = snapshot_rx.changed() => {
+                changed = srx.changed() => {
                     if changed.is_err() {
                         break;
                     }
-                    let snap = snapshot_rx.borrow_and_update().clone();
+                    let snap = srx.borrow_and_update().clone();
                     let msg = ServerMessage::WorldSnapshot {
                         version: PROTOCOL_VERSION_V1,
                         payload: (*snap).clone(),
@@ -129,19 +134,43 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
                     }
                 };
 
-                let (session, reconnected) = {
-                    let mut mgr = runtime.sessions.lock().await;
-                    mgr.connect_or_resume(hello.client_name, hello.session_id, hello.role)
-                };
-                session_id = Some(session.session_id.clone());
-                handshake_complete = true;
-
+                let runtime = rooms.get_or_create_room(hello.room_id.as_deref()).await;
                 let world_id = {
                     let w = runtime.world.lock().await;
                     w.world_id.clone()
                 };
 
-                info!(session_id = %session.session_id, client = %session.client_name, role = %session.role.as_str(), reconnected, "WebSocket client handshake complete");
+                let (session, reconnected) = {
+                    let mut mgr = runtime.sessions.lock().await;
+                    mgr.connect_or_resume(
+                        hello.client_name,
+                        hello.session_id,
+                        hello.role,
+                        world_id.clone(),
+                        hello.vessel_id,
+                    )
+                };
+
+                if session.controlled_entity_id == "OPFOR-SUB" {
+                    let mut w = runtime.world.lock().await;
+                    if let Some(opfor) = w.get_submarine_mut("OPFOR-SUB") {
+                        opfor.human_controlled = true;
+                    }
+                }
+
+                active_room = Some(runtime.clone());
+                session_id = Some(session.session_id.clone());
+                handshake_complete = true;
+
+                info!(
+                    session_id = %session.session_id,
+                    client = %session.client_name,
+                    room = %world_id,
+                    vessel = %session.controlled_entity_id,
+                    role = %session.role.as_str(),
+                    reconnected,
+                    "WebSocket client handshake complete"
+                );
 
                 let _ = ctrl_tx
                     .send(ServerMessage::Welcome {
@@ -150,6 +179,7 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
                             session_id: session.session_id.clone(),
                             world_id,
                             assigned_role: session.role.as_str().to_string(),
+                            vessel_id: session.controlled_entity_id.clone(),
                             sim_hz: runtime.config.sim_hz,
                             snapshot_hz: runtime.config.snapshot_hz,
                             reconnected,
@@ -157,15 +187,17 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
                     })
                     .await;
 
-                // Send a fresh complete initial/reconnected WORLD_SNAPSHOT immediately
-                let initial_snap = runtime.publish_latest_snapshot().await;
+                let initial_snap = runtime.snapshot_for(&session.controlled_entity_id).await;
                 let _ = ctrl_tx
                     .send(ServerMessage::WorldSnapshot {
                         version: PROTOCOL_VERSION_V1,
                         payload: (*initial_snap).clone(),
                     })
                     .await;
-                let _ = handshake_tx.send(true);
+
+                let srx = runtime.subscribe_snapshots(&session.controlled_entity_id);
+                let erx = runtime.event_tx.subscribe();
+                let _ = stream_tx.send((srx, erx)).await;
             }
             "PING" => {
                 if !handshake_complete {
@@ -174,6 +206,7 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
                         .await;
                     continue;
                 }
+                let Some(runtime) = active_room.as_ref() else { continue; };
                 let ping: PingPayload = match serde_json::from_value(envelope.payload) {
                     Ok(p) => p,
                     Err(err) => {
@@ -208,6 +241,7 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
                         .await;
                     continue;
                 }
+                let Some(runtime) = active_room.as_ref() else { continue; };
                 let cmd: CommandPayload = match serde_json::from_value(envelope.payload) {
                     Ok(c) => c,
                     Err(err) => {
@@ -238,7 +272,14 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
                     validate_and_apply_command(&mut world, &session, &cmd.command, cmd.value)
                 };
 
-                debug!(session_id = %session.session_id, command = %cmd.command, value = cmd.value, accepted = result.accepted, "Processed client command");
+                debug!(
+                    session_id = %session.session_id,
+                    vessel = %session.controlled_entity_id,
+                    command = %cmd.command,
+                    value = cmd.value,
+                    accepted = result.accepted,
+                    "Processed client command"
+                );
 
                 let _ = ctrl_tx
                     .send(ServerMessage::CommandResult {
@@ -264,7 +305,7 @@ pub async fn handle_socket(socket: WebSocket, runtime: Arc<SimulationRuntime>) {
         }
     }
 
-    if let Some(sid) = session_id {
+    if let (Some(runtime), Some(sid)) = (active_room, session_id) {
         let mut mgr = runtime.sessions.lock().await;
         mgr.disconnect(&sid);
         info!(session_id = %sid, "WebSocket client disconnected (simulation continues)");

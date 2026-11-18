@@ -3,7 +3,7 @@ use crate::session::client::ClientSession;
 use crate::world::entity::normalize_heading;
 use crate::world::state::AuthoritativeWorld;
 
-/// Validates and applies a player command against the authoritative world.
+/// Validates and applies a player command against the authoritative submarine owned by `session`.
 pub fn validate_and_apply_command(
     world: &mut AuthoritativeWorld,
     session: &ClientSession,
@@ -21,12 +21,37 @@ pub fn validate_and_apply_command(
         );
     }
 
-    if !session.can_command_own_sub || session.controlled_entity_id != world.own_sub.id {
+    let Some((vessel_sunk, max_speed, max_depth, ping_cd)) = world
+        .get_submarine(&session.controlled_entity_id)
+        .map(|s| (s.sunk, s.max_speed_kts, s.max_depth_m, s.active_ping_cooldown_sec))
+    else {
         return (
             CommandResultPayload {
                 accepted: false,
                 command: command.to_string(),
-                message: "Client is not authorized to command SSN-774.".to_string(),
+                message: "Controlled submarine not found in world.".to_string(),
+            },
+            None,
+        );
+    };
+
+    if !session.can_command_own_sub {
+        return (
+            CommandResultPayload {
+                accepted: false,
+                command: command.to_string(),
+                message: "Client is not authorized to issue vessel commands.".to_string(),
+            },
+            None,
+        );
+    }
+
+    if vessel_sunk {
+        return (
+            CommandResultPayload {
+                accepted: false,
+                command: command.to_string(),
+                message: format!("{} has been lost.", session.controlled_entity_id),
             },
             None,
         );
@@ -54,6 +79,8 @@ pub fn validate_and_apply_command(
         );
     }
 
+    let vessel_id = session.controlled_entity_id.clone();
+
     match command {
         "SET_HEADING" => {
             if !session.role.can_helm() {
@@ -77,12 +104,14 @@ pub fn validate_and_apply_command(
                 );
             }
             let normalized = normalize_heading(value);
-            world.own_sub.ordered_heading_deg = normalized;
+            if let Some(sub) = world.get_submarine_mut(&vessel_id) {
+                sub.ordered_heading_deg = normalized;
+            }
             let event = WorldEventPayload {
                 event_id: world.next_event_id(),
                 server_tick: world.tick,
                 category: "CONN".to_string(),
-                message: format!("{} ordered course {:03.0}° TRUE.", session.client_name, normalized),
+                message: format!("[{vessel_id}] {} ordered course {:03.0}° TRUE.", session.client_name, normalized),
             };
             (
                 CommandResultPayload {
@@ -104,25 +133,24 @@ pub fn validate_and_apply_command(
                     None,
                 );
             }
-            if !(-5.0..=world.own_sub.max_speed_kts).contains(&value) {
+            if !(-5.0..=max_speed).contains(&value) {
                 return (
                     CommandResultPayload {
                         accepted: false,
                         command: command.to_string(),
-                        message: format!(
-                            "Speed {value} out of valid range [-5, {}] kts.",
-                            world.own_sub.max_speed_kts
-                        ),
+                        message: format!("Speed {value} out of valid range [-5, {max_speed}] kts."),
                     },
                     None,
                 );
             }
-            world.own_sub.ordered_speed_kts = value;
+            if let Some(sub) = world.get_submarine_mut(&vessel_id) {
+                sub.ordered_speed_kts = value;
+            }
             let event = WorldEventPayload {
                 event_id: world.next_event_id(),
                 server_tick: world.tick,
                 category: "HELM".to_string(),
-                message: format!("{} ordered speed {:.1} kts.", session.client_name, value),
+                message: format!("[{vessel_id}] {} ordered speed {:.1} kts.", session.client_name, value),
             };
             (
                 CommandResultPayload {
@@ -144,25 +172,24 @@ pub fn validate_and_apply_command(
                     None,
                 );
             }
-            if !(0.0..=world.own_sub.max_depth_m).contains(&value) {
+            if !(0.0..=max_depth).contains(&value) {
                 return (
                     CommandResultPayload {
                         accepted: false,
                         command: command.to_string(),
-                        message: format!(
-                            "Depth {value} out of valid range [0, {}] m.",
-                            world.own_sub.max_depth_m
-                        ),
+                        message: format!("Depth {value} out of valid range [0, {max_depth}] m."),
                     },
                     None,
                 );
             }
-            world.own_sub.ordered_depth_m = value;
+            if let Some(sub) = world.get_submarine_mut(&vessel_id) {
+                sub.ordered_depth_m = value;
+            }
             let event = WorldEventPayload {
                 event_id: world.next_event_id(),
                 server_tick: world.tick,
                 category: "DIVING".to_string(),
-                message: format!("{} ordered depth {:.0} m.", session.client_name, value),
+                message: format!("[{vessel_id}] {} ordered depth {:.0} m.", session.client_name, value),
             };
             (
                 CommandResultPayload {
@@ -184,27 +211,24 @@ pub fn validate_and_apply_command(
                     None,
                 );
             }
-            if world.own_sub.active_ping_cooldown_sec > 0.0 {
+            if ping_cd > 0.0 {
                 return (
                     CommandResultPayload {
                         accepted: false,
                         command: command.to_string(),
-                        message: format!(
-                            "Active sonar recharging ({:.1}s).",
-                            world.own_sub.active_ping_cooldown_sec
-                        ),
+                        message: format!("Active sonar recharging ({ping_cd:.1}s)."),
                     },
                     None,
                 );
             }
-            let echoes = world.trigger_active_ping();
+            let echoes = world.trigger_active_ping(&vessel_id);
             let event = WorldEventPayload {
                 event_id: world.next_event_id(),
                 server_tick: world.tick,
                 category: "SONAR".to_string(),
                 message: format!(
-                    "{} transmitted 3.5 kHz Active Ping ({} echo returns).",
-                    session.client_name, echoes
+                    "[{vessel_id}] {} transmitted 3.5 kHz Active Ping ({echoes} echo returns).",
+                    session.client_name
                 ),
             };
             (
@@ -212,6 +236,39 @@ pub fn validate_and_apply_command(
                     accepted: true,
                     command: command.to_string(),
                     message: format!("Active ping transmitted ({echoes} echoes)."),
+                },
+                Some(event),
+            )
+        }
+        "TOGGLE_TOWED_ARRAY" => {
+            if !session.role.can_sonar() {
+                return (
+                    CommandResultPayload {
+                        accepted: false,
+                        command: command.to_string(),
+                        message: format!("Role {} cannot operate towed array.", session.role.as_str()),
+                    },
+                    None,
+                );
+            }
+            let deployed = if let Some(sub) = world.get_submarine_mut(&vessel_id) {
+                sub.towed_array_deployed = !sub.towed_array_deployed;
+                sub.towed_array_deployed
+            } else {
+                false
+            };
+            let state_str = if deployed { "DEPLOYED" } else { "RETRACTED" };
+            let event = WorldEventPayload {
+                event_id: world.next_event_id(),
+                server_tick: world.tick,
+                category: "SONAR".to_string(),
+                message: format!("[{vessel_id}] TB-29A Towed Array {state_str}."),
+            };
+            (
+                CommandResultPayload {
+                    accepted: true,
+                    command: command.to_string(),
+                    message: format!("Towed array {state_str}."),
                 },
                 Some(event),
             )
@@ -237,7 +294,8 @@ pub fn validate_and_apply_command(
                     None,
                 );
             }
-            if world.own_sub.torpedoes_remaining == 0 {
+            let brg = normalize_heading(value);
+            let Some(wep_id) = world.launch_torpedo(&vessel_id, brg) else {
                 return (
                     CommandResultPayload {
                         accepted: false,
@@ -246,16 +304,14 @@ pub fn validate_and_apply_command(
                     },
                     None,
                 );
-            }
-            let brg = normalize_heading(value);
-            let wep_id = world.launch_torpedo(brg);
+            };
             let event = WorldEventPayload {
                 event_id: world.next_event_id(),
                 server_tick: world.tick,
                 category: "WEPS".to_string(),
                 message: format!(
-                    "{} launched {} bearing {:03.0}° TRUE!",
-                    session.client_name, wep_id, brg
+                    "[{vessel_id}] {} launched {wep_id} bearing {brg:03.0}° TRUE!",
+                    session.client_name
                 ),
             };
             (
@@ -263,6 +319,42 @@ pub fn validate_and_apply_command(
                     accepted: true,
                     command: command.to_string(),
                     message: format!("{wep_id} away bearing {brg:03.0}°."),
+                },
+                Some(event),
+            )
+        }
+        "DEPLOY_DECOY" => {
+            if !session.role.can_weapons() {
+                return (
+                    CommandResultPayload {
+                        accepted: false,
+                        command: command.to_string(),
+                        message: format!("Role {} cannot deploy countermeasures.", session.role.as_str()),
+                    },
+                    None,
+                );
+            }
+            let Some(decoy_id) = world.deploy_decoy(&vessel_id) else {
+                return (
+                    CommandResultPayload {
+                        accepted: false,
+                        command: command.to_string(),
+                        message: "No acoustic decoys remaining.".to_string(),
+                    },
+                    None,
+                );
+            };
+            let event = WorldEventPayload {
+                event_id: world.next_event_id(),
+                server_tick: world.tick,
+                category: "WEPS".to_string(),
+                message: format!("[{vessel_id}] Deployed {decoy_id} acoustic decoy noisemaker!"),
+            };
+            (
+                CommandResultPayload {
+                    accepted: true,
+                    command: command.to_string(),
+                    message: format!("{decoy_id} deployed."),
                 },
                 Some(event),
             )

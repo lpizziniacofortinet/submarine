@@ -2,7 +2,6 @@ use serde::{Deserialize, Serialize};
 
 pub const PROTOCOL_VERSION_V1: u32 = 1;
 
-/// Raw incoming envelope used to validate protocol version before payload dispatch.
 #[derive(Debug, Clone, Deserialize)]
 pub struct IncomingEnvelope {
     #[serde(rename = "type")]
@@ -22,6 +21,10 @@ pub struct HelloPayload {
     pub session_id: Option<String>,
     #[serde(default)]
     pub role: Option<String>,
+    #[serde(default)]
+    pub room_id: Option<String>,
+    #[serde(default)]
+    pub vessel_id: Option<String>,
 }
 
 #[derive(Debug, Clone, Deserialize)]
@@ -79,6 +82,7 @@ pub struct WelcomePayload {
     pub session_id: String,
     pub world_id: String,
     pub assigned_role: String,
+    pub vessel_id: String,
     pub sim_hz: u32,
     pub snapshot_hz: u32,
     pub reconnected: bool,
@@ -94,6 +98,7 @@ pub struct ClientWorldSnapshot {
     pub own_sub: ClientOwnSubView,
     pub contacts: Vec<ClientContactView>,
     pub weapons: Vec<ClientWeaponView>,
+    pub decoys: Vec<ClientDecoyView>,
     pub environment: ClientEnvironmentView,
 }
 
@@ -110,7 +115,10 @@ pub struct ClientOwnSubView {
     pub ordered_speed_kts: f64,
     pub depth_m: f64,
     pub ordered_depth_m: f64,
+    pub hull_integrity_pct: f64,
     pub torpedoes_remaining: u32,
+    pub decoys_remaining: u32,
+    pub towed_array_deployed: bool,
     pub active_ping_cooldown_sec: f64,
 }
 
@@ -123,8 +131,9 @@ pub struct ClientContactView {
     pub allegiance: String,
     pub bearing_deg: f64,
     pub snr_db: f64,
+    pub tma_quality_pct: f64,
     pub ranged: bool,
-    // Strictly None unless ranged by active sonar or close-in visual/ESM
+    // Strictly None unless ranged by active sonar or high-confidence TMA
     pub lat: Option<f64>,
     pub lon: Option<f64>,
     pub range_nm: Option<f64>,
@@ -138,10 +147,20 @@ pub struct ClientContactView {
 pub struct ClientWeaponView {
     pub id: String,
     pub weapon_type: String,
+    pub owner_id: String,
     pub lat: f64,
     pub lon: f64,
     pub heading_deg: f64,
     pub speed_kts: f64,
+    pub depth_m: f64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClientDecoyView {
+    pub id: String,
+    pub lat: f64,
+    pub lon: f64,
     pub depth_m: f64,
 }
 

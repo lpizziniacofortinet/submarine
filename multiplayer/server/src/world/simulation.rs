@@ -9,52 +9,75 @@ use crate::network::protocol::{ClientWorldSnapshot, WorldEventPayload};
 use crate::session::client::SessionManager;
 use crate::world::state::AuthoritativeWorld;
 
-/// Shared authoritative runtime state accessed by HTTP/WebSocket handlers and simulation tasks.
+/// Shared authoritative runtime state for a single match room.
 pub struct SimulationRuntime {
     pub config: ServerConfig,
     pub world: Mutex<AuthoritativeWorld>,
     pub sessions: Mutex<SessionManager>,
-    pub snapshot_tx: watch::Sender<Arc<ClientWorldSnapshot>>,
+    pub snapshot_tx_ssn774: watch::Sender<Arc<ClientWorldSnapshot>>,
+    pub snapshot_tx_opfor: watch::Sender<Arc<ClientWorldSnapshot>>,
     pub event_tx: broadcast::Sender<WorldEventPayload>,
     pub snapshot_seq: AtomicU64,
 }
 
 impl SimulationRuntime {
-    pub fn new(config: ServerConfig) -> Arc<Self> {
-        let world = AuthoritativeWorld::new_mediterranean_patrol();
-        let initial_snapshot = Arc::new(world.to_client_snapshot(0));
-        let (snapshot_tx, _) = watch::channel(initial_snapshot);
+    pub fn new(config: ServerConfig, world_id: impl Into<String>) -> Arc<Self> {
+        let world = AuthoritativeWorld::new_mediterranean_patrol(world_id);
+        let init_ssn = Arc::new(world.to_client_snapshot_for("SSN-774", 0));
+        let init_opfor = Arc::new(world.to_client_snapshot_for("OPFOR-SUB", 0));
+        let (snapshot_tx_ssn774, _) = watch::channel(init_ssn);
+        let (snapshot_tx_opfor, _) = watch::channel(init_opfor);
         let (event_tx, _) = broadcast::channel(128);
 
         Arc::new(Self {
             config,
             world: Mutex::new(world),
             sessions: Mutex::new(SessionManager::new()),
-            snapshot_tx,
+            snapshot_tx_ssn774,
+            snapshot_tx_opfor,
             event_tx,
             snapshot_seq: AtomicU64::new(0),
         })
     }
 
-    pub async fn publish_latest_snapshot(&self) -> Arc<ClientWorldSnapshot> {
+    pub fn subscribe_snapshots(&self, vessel_id: &str) -> watch::Receiver<Arc<ClientWorldSnapshot>> {
+        if vessel_id == "OPFOR-SUB" {
+            self.snapshot_tx_opfor.subscribe()
+        } else {
+            self.snapshot_tx_ssn774.subscribe()
+        }
+    }
+
+    pub async fn publish_latest_snapshots(&self) -> (Arc<ClientWorldSnapshot>, Arc<ClientWorldSnapshot>) {
         let seq = self.snapshot_seq.fetch_add(1, Ordering::Relaxed) + 1;
-        let snapshot = {
+        let (snap_ssn, snap_opfor) = {
             let guard = self.world.lock().await;
-            Arc::new(guard.to_client_snapshot(seq))
+            (
+                Arc::new(guard.to_client_snapshot_for("SSN-774", seq)),
+                Arc::new(guard.to_client_snapshot_for("OPFOR-SUB", seq)),
+            )
         };
-        let _ = self.snapshot_tx.send(snapshot.clone());
-        snapshot
+        let _ = self.snapshot_tx_ssn774.send(snap_ssn.clone());
+        let _ = self.snapshot_tx_opfor.send(snap_opfor.clone());
+        (snap_ssn, snap_opfor)
+    }
+
+    pub async fn snapshot_for(&self, vessel_id: &str) -> Arc<ClientWorldSnapshot> {
+        let (snap_ssn, snap_opfor) = self.publish_latest_snapshots().await;
+        if vessel_id == "OPFOR-SUB" {
+            snap_opfor
+        } else {
+            snap_ssn
+        }
     }
 }
 
 /// Starts the independent 30 Hz fixed-step simulation loop and 10 Hz snapshot scheduler.
-/// Simulation continues running regardless of whether any clients are connected.
 pub fn spawn_simulation_loops(runtime: Arc<SimulationRuntime>) {
     let sim_hz = runtime.config.sim_hz.max(1);
     let fixed_dt = Duration::from_secs_f64(1.0 / sim_hz as f64);
     let fixed_dt_sec = fixed_dt.as_secs_f64();
 
-    // 1. Authoritative 30 Hz monotonic fixed-step simulation loop
     let sim_runtime = runtime.clone();
     tokio::spawn(async move {
         let mut last = Instant::now();
@@ -69,7 +92,6 @@ pub fn spawn_simulation_loops(runtime: Arc<SimulationRuntime>) {
             let frame_delta = now.saturating_duration_since(last);
             last = now;
 
-            // Clamp delta to prevent unbounded catch-up loops after OS scheduling stalls
             let clamped = frame_delta.min(fixed_dt * 4);
             accumulator += clamped;
 
@@ -95,7 +117,6 @@ pub fn spawn_simulation_loops(runtime: Arc<SimulationRuntime>) {
         }
     });
 
-    // 2. Independent 10 Hz snapshot broadcast + heartbeat timeout pruning
     let snap_hz = runtime.config.snapshot_hz.max(1);
     let snap_dt = Duration::from_secs_f64(1.0 / snap_hz as f64);
     let snap_runtime = runtime.clone();
@@ -114,7 +135,7 @@ pub fn spawn_simulation_loops(runtime: Arc<SimulationRuntime>) {
             if timed_out > 0 {
                 debug!(timed_out, "Pruned timed-out client sessions");
             }
-            let _ = snap_runtime.publish_latest_snapshot().await;
+            let _ = snap_runtime.publish_latest_snapshots().await;
         }
     });
 }

@@ -14,11 +14,13 @@
       this.reconnectTimer = null;
     }
 
-    connect(wsUrl, clientName, role = 'COMMANDER') {
+    connect(wsUrl, clientName, role = 'COMMANDER', roomId = 'med-patrol-alpha', vesselId = 'SSN-774') {
       this.manualClose = false;
       this.wsUrl = wsUrl;
       this.clientName = clientName || 'CONN-ALPHA';
       this.role = role || 'COMMANDER';
+      this.roomId = roomId || 'med-patrol-alpha';
+      this.vesselId = vesselId || 'SSN-774';
       this._clearTimers();
 
       if (this.ws) {
@@ -30,7 +32,7 @@
       this.ws = ws;
 
       ws.onopen = () => {
-        ws.send(root.MultiplayerProtocol.buildHello(this.clientName, this.sessionId, this.role));
+        ws.send(root.MultiplayerProtocol.buildHello(this.clientName, this.sessionId, this.role, this.roomId, this.vesselId));
         this.pingTimer = setInterval(() => {
           if (this.ws && this.ws.readyState === WebSocket.OPEN) {
             this.ws.send(root.MultiplayerProtocol.buildPing(performance.now()));
@@ -58,7 +60,7 @@
         this._clearTimers();
         this._setStatus('DISCONNECTED');
         if (!this.manualClose) {
-          this.reconnectTimer = setTimeout(() => this.connect(this.wsUrl, this.clientName, this.role), 2500);
+          this.reconnectTimer = setTimeout(() => this.connect(this.wsUrl, this.clientName, this.role, this.roomId, this.vesselId), 2500);
         }
       };
 

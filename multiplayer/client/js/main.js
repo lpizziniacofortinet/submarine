@@ -6,6 +6,7 @@
   wsInput.value = defaultWs;
 
   const renderer = new window.TacticalCanvasRenderer('tactical-canvas');
+  const waterfall = new window.SonarWaterfallRenderer('sonar-waterfall-canvas');
   let snapshotHz = 10;
 
   function logEvent(text, level = 'info') {
@@ -30,7 +31,9 @@
     document.getElementById('sub-hdg').textContent = `${sub.headingDeg.toFixed(1)}° / ${sub.orderedHeadingDeg.toFixed(0)}°`;
     document.getElementById('sub-spd').textContent = `${sub.speedKts.toFixed(1)} / ${sub.orderedSpeedKts.toFixed(1)} KT`;
     document.getElementById('sub-dep').textContent = `${sub.depthM.toFixed(1)} / ${sub.orderedDepthM.toFixed(0)} m`;
-    document.getElementById('sub-torps').textContent = `${sub.torpedoesRemaining} READY`;
+    document.getElementById('sub-hull').textContent = `${sub.hullIntegrityPct.toFixed(0)}%`;
+    document.getElementById('sub-torps').textContent = `${sub.torpedoesRemaining} TORP / ${sub.decoysRemaining} ADC`;
+    document.getElementById('val-towed').textContent = `TOWED ARRAY: ${sub.towedArrayDeployed ? 'DEPLOYED' : 'RETRACTED'}`;
 
     const env = snap.environment;
     document.getElementById('val-env').textContent =
@@ -49,7 +52,7 @@
       for (const c of contacts) {
         const li = document.createElement('li');
         li.className = c.allegiance === 'HOSTILE' ? 'hostile' : 'neutral';
-        const rangeText = c.ranged && c.rangeNm !== null ? `${c.rangeNm.toFixed(1)} NM` : 'PASSIVE BRG ONLY';
+        const rangeText = c.ranged && c.rangeNm !== null ? `${c.rangeNm.toFixed(1)} NM` : `PASSIVE (TMA ${c.tmaQualityPct}%)`;
         li.textContent = `${c.id} | ${c.designation} | BRG ${c.bearingDeg.toFixed(0)}° | ${rangeText} | SNR +${c.snrDb.toFixed(1)} dB`;
         listEl.appendChild(li);
       }
@@ -81,6 +84,7 @@
         );
       } else if (msg.type === 'WORLD_SNAPSHOT') {
         renderer.pushSnapshot(msg.payload, snapshotHz);
+        waterfall.step(msg.payload);
         updateSnapshotUI(msg.payload);
       } else if (msg.type === 'WORLD_EVENT') {
         logEvent(`[${msg.payload.category}] ${msg.payload.message}`, 'info');
@@ -99,7 +103,9 @@
     net.connect(
       wsInput.value.trim(),
       document.getElementById('input-callsign').value.trim(),
-      document.getElementById('select-role').value
+      document.getElementById('select-role').value,
+      document.getElementById('input-room-id').value.trim(),
+      document.getElementById('select-vessel').value
     );
   });
   document.getElementById('btn-disconnect').addEventListener('click', () => net.disconnect());
@@ -118,6 +124,12 @@
   });
   document.getElementById('btn-active-ping').addEventListener('click', () => {
     net.sendCommand('ACTIVE_PING', 1);
+  });
+  document.getElementById('btn-toggle-array').addEventListener('click', () => {
+    net.sendCommand('TOGGLE_TOWED_ARRAY', 1);
+  });
+  document.getElementById('btn-deploy-decoy').addEventListener('click', () => {
+    net.sendCommand('DEPLOY_DECOY', 1);
   });
 
   function renderLoop() {
