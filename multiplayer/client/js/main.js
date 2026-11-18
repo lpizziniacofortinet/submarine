@@ -146,6 +146,10 @@
       pill.className = `pill ${connectionClass}`;
       const indicator = document.querySelector('.state-indicator');
       if (indicator) indicator.className = `state-indicator ${connectionClass}`;
+      const telemetryLink = document.getElementById('telemetry-live');
+      const telemetryLabel = document.getElementById('telemetry-link-label');
+      if (telemetryLink) telemetryLink.className = `telemetry-live ${connectionClass}`;
+      if (telemetryLabel) telemetryLabel.textContent = status === 'CONNECTED' ? 'LIVE SERVER FEED' : status === 'CONNECTING' ? 'ESTABLISHING LINK' : 'AWAITING SERVER';
       document.getElementById('btn-connect').disabled = status !== 'DISCONNECTED';
       document.getElementById('btn-disconnect').disabled = status === 'DISCONNECTED';
     },
