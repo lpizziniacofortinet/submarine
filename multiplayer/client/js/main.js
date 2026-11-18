@@ -48,6 +48,8 @@
     document.getElementById('hud-seabed').textContent = `${env.waterDepthM.toFixed(0)} m`;
     document.getElementById('hud-hull').textContent = `${sub.hullIntegrityPct.toFixed(0)}%`;
     document.getElementById('dmg-hull').textContent = `${sub.hullIntegrityPct.toFixed(0)}%`;
+    const hullFill = document.getElementById('status-hull-fill');
+    if (hullFill) hullFill.style.width = `${Math.max(0, Math.min(100, sub.hullIntegrityPct))}%`;
     document.getElementById('hud-sim-time').textContent = `${snap.simTimeSec.toFixed(1)} s`;
     document.getElementById('val-snap-seq').textContent = `SEQ ${snap.snapshotSeq}`;
     document.getElementById('val-last-snap').textContent = new Date().toLocaleTimeString();
@@ -140,7 +142,10 @@
     onStatusChange(status) {
       const pill = document.getElementById('conn-pill');
       pill.textContent = status === 'CONNECTED' ? 'ONLINE' : status;
-      pill.className = `pill ${status === 'CONNECTED' ? 'online' : status === 'CONNECTING' ? 'connecting' : 'offline'}`;
+      const connectionClass = status === 'CONNECTED' ? 'online' : status === 'CONNECTING' ? 'connecting' : 'offline';
+      pill.className = `pill ${connectionClass}`;
+      const indicator = document.querySelector('.state-indicator');
+      if (indicator) indicator.className = `state-indicator ${connectionClass}`;
       document.getElementById('btn-connect').disabled = status !== 'DISCONNECTED';
       document.getElementById('btn-disconnect').disabled = status === 'DISCONNECTED';
     },
@@ -185,15 +190,17 @@
 
   document.getElementById('btn-audio-toggle').addEventListener('click', (e) => {
     const on = window.MultiplayerAudio.toggle();
-    e.target.textContent = `AUDIO: ${on ? 'ON' : 'OFF'}`;
-    e.target.classList.toggle('active', on);
+    const audioState = e.currentTarget.querySelector('.audio-state');
+    if (audioState) audioState.textContent = on ? 'ON' : 'OFF';
+    e.currentTarget.classList.toggle('active', on);
   });
 
   document.getElementById('btn-connect').addEventListener('click', () => {
     if (!window.MultiplayerAudio.enabled) {
       window.MultiplayerAudio.enable();
       const audioBtn = document.getElementById('btn-audio-toggle');
-      audioBtn.textContent = 'AUDIO: ON';
+      const audioState = audioBtn.querySelector('.audio-state');
+      if (audioState) audioState.textContent = 'ON';
       audioBtn.classList.add('active');
     }
     net.connect(
